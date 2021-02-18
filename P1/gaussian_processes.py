@@ -3,6 +3,8 @@
 Simulate Gaussian processes.
 
 @author: <alberto.suarez@uam.es>
+         <Antonio Coín Castro>
+         <Luis Antonio Ortega Andrés>
 """
 # Load packages
 
@@ -60,9 +62,47 @@ def rbf_kernel(
     d = distance.cdist(X, X_prime, metric='euclidean')
     return A * np.exp(-0.5 * (d / ls)**2)
 
-def covariance_function(x, y, kernel_fn):
+def covariance_function(
+        x: np.ndarray,
+        y: np.ndarray,
+        kernel_fn: Callable[[np.ndarray], np.ndarray]
+) -> np.ndarray:
+    """
+    Compute kernel matrix of the given input arrays. Usable
+    over kernel_fn that are not capable of computing the
+    kernel matrix directly over the vectors but are vectorized.
+
+    Parameters
+    ----------
+    x :
+        Frist array of values.
+    y :
+        Second array of values.
+
+    Returns
+    -------
+    K :
+        Matrix with kernel application to x@y.T.
+
+    Example:
+    >>> t0, t1 = (0.0, 1.0)
+    >>> t = np.linspace(t0, t1, 4)
+    >>> def kernel_fn(s,t):
+    ...     return (np.minimum(s,t) - s * t)
+    >>> print(covariance_function(t,t, kernel_fn))
+    [[0.         0.         0.         0.        ]
+     [0.         0.22222222 0.11111111 0.        ]
+     [0.         0.11111111 0.22222222 0.        ]
+     [0.         0.         0.         0.        ]]
+    """
+
+    # Compute meshgrid of the given arrays.
     xv, yv = np.meshgrid(x, y, sparse=False, indexing='ij')
-    return(kernel_fn(xv, yv))
+
+    # Compute the kernel over matrixes (vectorized operation).
+    K = kernel_fn(xv, yv)
+
+    return(K)
 
 def simulate_gp(
     t: np.ndarray,
@@ -127,14 +167,20 @@ def simulate_gp(
     #  Do not use numpy.random.multivariate_normal
     #  Use np.linalg.svd
 
+    # Compute kernel matrix using auxiliary function.
     kernel_matrix = covariance_function(t,t, kernel_fn)
+
+    # SVD decomposition and transform s to matrix
     u, s, vh = np.linalg.svd(kernel_matrix, full_matrices=True)
     s = np.diag(s)
 
+    # Draw from standard Gaussian
     z = np.random.randn(M, len(t))
 
+    # Compute Gaussian process' mean
     mu = mean_fn(t)
 
+    # Gaussian process samples using SVD decomposition formula.
     X = z@np.sqrt(s)@u.T + mu
 
     return X, mu, kernel_matrix
@@ -221,13 +267,17 @@ def simulate_conditional_gp(
     # NOTE Use 'multivariate_normal' from numpy with "'method = 'svd'".
     # 'svd' is slower, but numerically more robust than 'cholesky'
 
+    # Compute kernel matrixes for (t,t), (t,t_obs) and (t_obs, t_obs)
     K_xx = covariance_function(t,t, kernel_fn)
     K_xy = covariance_function(t, t_obs, kernel_fn)
     K_yy_inv = np.linalg.inv(covariance_function(t_obs, t_obs, kernel_fn))
 
+    # Mean and covariance matrix of Gaussian process with observed values
     mean_vector = K_xy@K_yy_inv@x_obs
     kernel_matrix = K_xx - K_xy@K_yy_inv@K_xy.T
 
+    # Draw samples using Numpy's multivariate_normal. SVD decomposition
+    # is used by default.
     X = np.random.default_rng().multivariate_normal(mean_vector, kernel_matrix, size = M)
 
     return X, mean_vector, kernel_matrix
@@ -255,6 +305,7 @@ def gp_regression(
 
     kernel_fn:
         Kernel (covariance) function.
+        Must compute tensor (matrix) when given input data.
 
     sigma2_noise:
         Variance of the noise.
@@ -287,14 +338,19 @@ def gp_regression(
     # NOTE use 'np.linalg.solve' instead of inverting the matrix.
     # This procedure is numerically more robust.
 
+    # Compute kernel matrixes.
     K_tt = kernel_fn(X_test,X_test)
     K_xt = kernel_fn(X, X_test)
     K_xx = kernel_fn(X, X,)
 
-    K_ridge = np.linalg.solve(K_xx + sigma2_noise*np.identity(len(X)), np.identity(len(X)))
+    # Solve Ax = I with A noissy affected matrix
+    K_ridge_inv = np.linalg.solve(K_xx + sigma2_noise*np.identity(len(X)),
+                                  np.identity(len(X)))
 
-    prediction_mean = K_xt.T@K_ridge@y
-    prediction_variance = K_tt - K_xt.T@K_ridge@K_xt
+    # Compute mean and covariance of Gaussian process
+    # with observed values
+    prediction_mean = K_xt.T@K_ridge_inv@y
+    prediction_variance = K_tt - K_xt.T@K_ridge_inv@K_xt
 
     return prediction_mean, prediction_variance
 
