@@ -57,52 +57,56 @@ def rbf_kernel(
     [[3.         2.88236832]
      [2.88236832 3.        ]
      [2.55643137 2.88236832]]
-
     """
     d = distance.cdist(X, X_prime, metric='euclidean')
     return A * np.exp(-0.5 * (d / ls)**2)
 
+
 def covariance_function(
-        x: np.ndarray,
-        y: np.ndarray,
+        t: np.ndarray,
+        s: np.ndarray,
         kernel_fn: Callable[[np.ndarray], np.ndarray]
 ) -> np.ndarray:
     """
-    Compute kernel matrix of the given input arrays. Usable
-    over kernel_fn that are not capable of computing the
-    kernel matrix directly over the vectors but are vectorized.
+    Compute kernel matrix for two 1D-arrays
+    of discretized times.
 
     Parameters
     ----------
-    x :
-        Frist array of values.
-    y :
-        Second array of values.
+    t :
+        First array of values with shape (N,).
+    s :
+        Second array of values with shape (M,).
 
     Returns
     -------
     K :
-        Matrix with kernel application to x@y.T.
+        Matrix resulting from applying the kernel
+        function to the input arrays, that is,
+        K[i, j] = kernel_fn(t[i], s[j]). It is an
+        np.ndarray with shape (N, M).
 
-    Example:
+    Example
+    -------
     >>> t0, t1 = (0.0, 1.0)
     >>> t = np.linspace(t0, t1, 4)
     >>> def kernel_fn(s,t):
     ...     return (np.minimum(s,t) - s * t)
-    >>> print(covariance_function(t,t, kernel_fn))
+    >>> print(covariance_function(t, t, kernel_fn))
     [[0.         0.         0.         0.        ]
      [0.         0.22222222 0.11111111 0.        ]
      [0.         0.11111111 0.22222222 0.        ]
      [0.         0.         0.         0.        ]]
     """
 
-    # Compute meshgrid of the given arrays.
-    xv, yv = np.meshgrid(x, y, sparse=False, indexing='ij')
+    # Compute meshgrid of the given input arrays.
+    tt, ss = np.meshgrid(t, s, indexing='ij')
 
-    # Compute the kernel over matrixes (vectorized operation).
-    K = kernel_fn(xv, yv)
+    # Evaluate the kernel over meshgrid (vectorized operation).
+    K = kernel_fn(tt, ss)
 
-    return(K)
+    return K
+
 
 def simulate_gp(
     t: np.ndarray,
@@ -162,29 +166,24 @@ def simulate_gp(
     >>> _= plt.title('Standard Brownian Bridge process')
     >>> plt.show()
     """
-    #  NOTE Use np.meshgrid for the arguments of
-    #  kernel_fn to compute the kernel matrix.
-    #  Do not use numpy.random.multivariate_normal
-    #  Use np.linalg.svd
 
     # Compute kernel matrix using auxiliary function.
-    kernel_matrix = covariance_function(t,t, kernel_fn)
+    kernel_matrix = covariance_function(t, t, kernel_fn)
 
     # SVD decomposition and transform s to matrix
-    u, s, vh = np.linalg.svd(kernel_matrix, full_matrices=True)
-    s = np.diag(s)
+    U, s, Vh = np.linalg.svd(kernel_matrix)
+    S = np.diag(s)
 
-    # Draw from standard Gaussian
-    z = np.random.randn(M, len(t))
+    # Sample from standard Gaussian
+    Z = np.random.randn(M, len(t))
 
-    # Compute Gaussian process' mean
+    # Compute mean of Gaussian process at each time
     mu = mean_fn(t)
 
-    # Gaussian process samples using SVD decomposition formula.
-    X = z@np.sqrt(s)@u.T + mu
+    # Generate Gaussian process samples using SVD decomposition.
+    X = Z@np.sqrt(S)@U.T + mu
 
     return X, mu, kernel_matrix
-
 
 
 def simulate_conditional_gp(
@@ -262,23 +261,20 @@ def simulate_conditional_gp(
     >>> _ = plt.plot(t, B.T)
     >>> _ = plt.xlabel('t')
     >>> _ =  plt.ylabel('B(t)')
-
     """
-    # NOTE Use 'multivariate_normal' from numpy with "'method = 'svd'".
-    # 'svd' is slower, but numerically more robust than 'cholesky'
-
-    # Compute kernel matrixes for (t,t), (t,t_obs) and (t_obs, t_obs)
-    K_xx = covariance_function(t,t, kernel_fn)
+    # Compute kernel matrices for (t, t), (t, t_obs) and (t_obs, t_obs)
+    K_xx = covariance_function(t, t, kernel_fn)
     K_xy = covariance_function(t, t_obs, kernel_fn)
-    K_yy_inv = np.linalg.inv(covariance_function(t_obs, t_obs, kernel_fn))
+    K_yy_inv = np.linalg.solve(
+        covariance_function(t_obs, t_obs, kernel_fn), np.identity(len(t_obs)))
 
-    # Mean and covariance matrix of Gaussian process with observed values
-    mean_vector = K_xy@K_yy_inv@x_obs
+    # Mean and covariance matrix of conditional Gaussian process
+    mean_vector = mean_fn(t) + K_xy@K_yy_inv@(x_obs - mean_fn(t_obs))
     kernel_matrix = K_xx - K_xy@K_yy_inv@K_xy.T
 
-    # Draw samples using Numpy's multivariate_normal. SVD decomposition
-    # is used by default.
-    X = np.random.default_rng().multivariate_normal(mean_vector, kernel_matrix, size = M)
+    # Draw samples using numpy's multivariate_normal and SVD decomposition
+    X = np.random.default_rng().multivariate_normal(
+        mean_vector, kernel_matrix, size=M, method="svd")
 
     return X, mean_vector, kernel_matrix
 
@@ -334,12 +330,8 @@ def gp_regression(
     >>> print(predictions)
     [1.00366515 2.02856104]
     """
-
-    # NOTE use 'np.linalg.solve' instead of inverting the matrix.
-    # This procedure is numerically more robust.
-
     # Compute kernel matrixes.
-    K_tt = kernel_fn(X_test,X_test)
+    K_tt = kernel_fn(X_test, X_test)
     K_xt = kernel_fn(X, X_test)
     K_xx = kernel_fn(X, X,)
 
