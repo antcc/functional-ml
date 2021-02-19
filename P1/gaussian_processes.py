@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 """
 Simulate Gaussian processes.
 
@@ -6,6 +7,7 @@ Simulate Gaussian processes.
          <Antonio Coín Castro>
          <Luis Antonio Ortega Andrés>
 """
+
 # Load packages
 
 from __future__ import annotations
@@ -98,11 +100,10 @@ def covariance_function(
      [0.         0.11111111 0.22222222 0.        ]
      [0.         0.         0.         0.        ]]
     """
-
-    # Compute meshgrid of the given input arrays.
+    # Compute meshgrid of the given input arrays
     tt, ss = np.meshgrid(t, s, indexing='ij')
 
-    # Evaluate the kernel over meshgrid (vectorized operation).
+    # Evaluate the kernel over meshgrid (vectorized operation)
     K = kernel_fn(tt, ss)
 
     return K
@@ -164,10 +165,8 @@ def simulate_gp(
     >>> _= plt.xlabel('t')
     >>> _=  plt.ylabel('BB(t)')
     >>> _= plt.title('Standard Brownian Bridge process')
-    >>> plt.show()
     """
-
-    # Compute kernel matrix using auxiliary function.
+    # Compute kernel matrix using auxiliary function
     kernel_matrix = covariance_function(t, t, kernel_fn)
 
     # SVD decomposition and transform s to matrix
@@ -180,7 +179,7 @@ def simulate_gp(
     # Compute mean of Gaussian process at each time
     mu = mean_fn(t)
 
-    # Generate Gaussian process samples using SVD decomposition.
+    # Generate Gaussian process samples using SVD decomposition
     X = Z@np.sqrt(S)@U.T + mu
 
     return X, mu, kernel_matrix
@@ -266,7 +265,8 @@ def simulate_conditional_gp(
     K_xx = covariance_function(t, t, kernel_fn)
     K_xy = covariance_function(t, t_obs, kernel_fn)
     K_yy_inv = np.linalg.solve(
-        covariance_function(t_obs, t_obs, kernel_fn), np.identity(len(t_obs)))
+        covariance_function(t_obs, t_obs, kernel_fn),
+        np.identity(len(t_obs)))
 
     # Mean and covariance matrix of conditional Gaussian process
     mean_vector = mean_fn(t) + K_xy@K_yy_inv@(x_obs - mean_fn(t_obs))
@@ -314,6 +314,7 @@ def gp_regression(
 
         prediction_variance:
             Uncertainty of the predictions.
+
     Example
     -------
     >>> import numpy as np
@@ -330,17 +331,17 @@ def gp_regression(
     >>> print(predictions)
     [1.00366515 2.02856104]
     """
-    # Compute kernel matrixes.
+    # Compute kernel matrices
     K_tt = kernel_fn(X_test, X_test)
     K_xt = kernel_fn(X, X_test)
-    K_xx = kernel_fn(X, X,)
+    K_xx = kernel_fn(X, X)
 
-    # Solve Ax = I with A noissy affected matrix
-    K_ridge_inv = np.linalg.solve(K_xx + sigma2_noise*np.identity(len(X)),
-                                  np.identity(len(X)))
+    # Solve Ax = I with A noisy affected matrix
+    I = np.identity(len(X))
+    K_ridge_inv = np.linalg.solve(K_xx + sigma2_noise*I, I)
 
     # Compute mean and covariance of Gaussian process
-    # with observed values
+    # conditional on observed values
     prediction_mean = K_xt.T@K_ridge_inv@y
     prediction_variance = K_tt - K_xt.T@K_ridge_inv@K_xt
 
