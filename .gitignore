@@ -1,4 +1,5 @@
 resources/
+mnist_*
 .ipynb_checkpoints/
 __pycache__
 .auctex-auto
