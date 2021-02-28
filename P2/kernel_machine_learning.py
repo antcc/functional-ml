@@ -64,7 +64,7 @@ def rbf_kernel(
 
 
 def compute_hat(
-    K: np.ndarray, 
+    K: np.ndarray,
     ) -> np.ndarray :
     """
     Auxiliary function to kernel_pca. Computes Gram matrix of the centered kernel given
@@ -114,7 +114,7 @@ def kernel_pca(
     # Gram matrix of centered kernel
     K_hat = compute_hat(K)
 
-    # Compute eigen vectors and values 
+    # Compute eigen vectors and values
     lambda_eigenvals, alpha_eigenvecs = np.linalg.eig(K_hat)
 
     # Handle complex values
@@ -127,7 +127,7 @@ def kernel_pca(
             warnings.warn(
                 'Maximum imaginary part is {}'.format(max_imaginary_part)
             )
- 
+
         lambda_eigenvals = np.real(lambda_eigenvals)
 
     K_test = kernel(X_test, X_test)
