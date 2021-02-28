@@ -1,3 +1,4 @@
+import warnings
 from typing import Callable, Tuple
 
 import numpy as np
@@ -8,17 +9,17 @@ def linear_kernel(
     X: np.ndarray,
     X_prime: np.ndarray,
 ) -> np.ndarray:
-    return X @ X_prime.T
+    return X@X_prime.T
 
 
 def exponential_kernel(
     X: np.ndarray,
     X_prime: np.ndarray,
     A: float,
-    l: float
+    ls: float,
 ) -> np.ndarray:
-    d = distance.cdist(X, X_prime, metric='minkovski', p=1.0)
-    return A * np.exp(- d / l)
+    d = distance.cdist(X, X_prime, metric='minkowski', p=1.0)
+    return A*np.exp(-d/ls)
 
 
 def rbf_kernel(
@@ -45,7 +46,7 @@ def rbf_kernel(
 
     Notes
     -------
-    Alternative parametrization (e.g. en sklearn)
+    Alternative parametrization (e.g. in sklearn)
     gamma = 0.5 / ls**2
 
     Example
@@ -60,19 +61,38 @@ def rbf_kernel(
     >>> print(kernel_matrix)
     """
     d = distance.cdist(X, X_prime, metric='euclidean')
-    return A * np.exp(-0.5 * (d / ls)**2)
+    return A*np.exp(-0.5*(d/ls)**2)
 
 
-def compute_hat(
-    K: np.ndarray,
-    ) -> np.ndarray :
+def compute_centered_gram_matrix(
+    K1: np.ndarray,
+    K2: np.ndarray = None,
+) -> np.ndarray:
     """
-    Auxiliary function to kernel_pca. Computes Gram matrix of the centered kernel given
-    the Gram matrix of the kernel.
+    Compute Gram matrix of centered kernel.
+
+    Parameters
+    ----------
+    K1:
+        An NxN kernel Gram matrix from training data.
+    K2:
+        An LxN kernel Gram matrix from test data.
+
+    Notes
+    -------
+    If K2=None, it computes the Gram matrix of the
+    centered kernel for training data. Otherwise it computes the
+    kernel Gram matrix for test data.
     """
-    N = K.shape[0]
-    ones = np.ones(K.shape)
-    return K - 1/N*(K@ones) - 1/N*(ones@K) + 1/(N**2)*(ones@K@ones)
+    N = K1.shape[0]
+    L = K2.shape[0] if K2 is not None else N
+    K2 = K1 if K2 is None else K2
+    ones = np.ones((N, N))
+    ones_prime = ones if K2 is None else np.ones((L, N))
+
+    return K2 - 1/N*(K2@ones) - 1/N*(ones_prime@K1) \
+        + 1/(N**2)*(ones_prime@K1@ones)
+
 
 def kernel_pca(
     X: np.ndarray,
@@ -86,10 +106,8 @@ def kernel_pca(
         Data matrix
     X_test:
         data matrix
-    A:
-        output variance
-    ls:
-        kernel lengthscale
+    kernel:
+        kernel function
 
     Returns
     -------
@@ -105,33 +123,42 @@ def kernel_pca(
     -------
     In the corresponding method of sklearn the eigenvectors
     are normalized in l2.
-
     """
-
-    # Build Gram Matrix
+    # Gram matrix of kernel
     K = kernel(X, X)
 
     # Gram matrix of centered kernel
-    K_hat = compute_hat(K)
+    K_hat = compute_centered_gram_matrix(K)
 
-    # Compute eigen vectors and values
-    lambda_eigenvals, alpha_eigenvecs = np.linalg.eig(K_hat)
+    # Compute eigenvectors and eigenvalues (in ascending order)
+    lambda_eigenvals, alpha_eigenvecs = np.linalg.eigh(K_hat)
+    tol = 1.0e-10
+    lambda_eigenvals[lambda_eigenvals < tol] = 0.0
 
-    # Handle complex values
-    if np.iscomplexobj(lambda_eigenvals):
-        threshold_imaginary_part = 1.0e-6
-        max_imaginary_part = np.max(
-            np.abs(np.imag(lambda_eigenvals))
-        )
-        if max_imaginary_part > threshold_imaginary_part:
-            warnings.warn(
-                'Maximum imaginary part is {}'.format(max_imaginary_part)
-            )
+    # Order eigenvalues and eigenvectors in descending order
+    lambda_eigenvals = lambda_eigenvals[::-1]
+    alpha_eigenvecs = alpha_eigenvecs[:, ::-1]
 
-        lambda_eigenvals = np.real(lambda_eigenvals)
+    # Compute (centered) projection matrix
+    K_test = kernel(X_test, X)
+    K_test_hat = compute_centered_gram_matrix(K, K_test)
 
-    K_test = kernel(X_test, X_test)
-    K_hat_test = compute_hat(K_test)
-    X_test_hat = K_hat_test@alpha_eigenvecs
+    """
+    NOTE: To follow sklearn's criterion and impose a deterministic
+    output when it comes to choosing the sign of the eigenvectors,
+    we would do the following:
+
+        from sklearn.utils.extmath import svd_flip
+        alpha_eigenvecs, _ = svd_flip(alpha_eigenvecs,
+            np.zeros_like(alpha_eigenvecs).T)
+    """
+
+    # RKHS normalization of eigenvectors, ignoring null components
+    non_zero = np.flatnonzero(lambda_eigenvals)
+    alpha_eigenvecs[:, non_zero] = (alpha_eigenvecs[:, non_zero]
+                                    / np.sqrt(lambda_eigenvals[non_zero]))
+
+    # Project principal components of non-zero eigenvalues
+    X_test_hat = K_test_hat@alpha_eigenvecs[:, non_zero]
 
     return X_test_hat, lambda_eigenvals, alpha_eigenvecs
