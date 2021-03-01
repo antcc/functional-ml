@@ -1,3 +1,14 @@
+# /usr/bin/python
+# -*- coding: utf-8 -*-
+
+"""
+Kernel methods in Machine Learning.
+
+Authors: <alberto.suarez@uam.es>
+         Luis Antonio Ortega Andrés
+         Antonio Coín Castro
+"""
+
 from typing import Callable, Tuple
 import matplotlib
 
@@ -166,9 +177,9 @@ def kernel_pca(
     return X_test_hat, lambda_eigenvals, alpha_eigenvecs
 
 
-class AnimationPCA:
-    """Display an animation of KPCA varying the
-       width parameter of an RBF kernel."""
+class AnimationKPCA:
+    """ Animation of KPCA projection varying the
+        width parameter of an RBF kernel. """
 
     def __init__(
         self,
@@ -274,14 +285,17 @@ class AnimationPCA:
         fig = plt.figure(figsize=(8, 5))
         ax = fig.add_subplot(111)
 
-        def rbf(X, X_prime):
+        def kernel(X, X_prime):
             return rbf_kernel(X, X_prime, self.A, self.L)
 
-        self.kernel = rbf
+        self.kernel = kernel
         reds = y_test == 0
         blues = y_test == 1
 
-        return anim.FuncAnimation(fig, self._update_plot,
-                                  frames=self.n_frames,
-                                  repeat=False,
-                                  fargs=(ax, X, X_test, reds, blues,))
+        return anim.FuncAnimation(
+            fig,
+            self._update_plot,
+            frames=self.n_frames,
+            repeat=False,
+            fargs=(ax, X, X_test, reds, blues,)
+        )

@@ -63,15 +63,21 @@ Las dos representaciones mostradas son correctas, solo que una está usando los 
 
 En PCA lineal no cambia por casualidad.
 
-**DUDA**: ¿qué hacemos con las componentes/autovalores nulos? ¿Devolvemos columnas con todo 0s? ¿O las eliminamos antes? ¿O no hacemos nada?
+\textbf{DUDA}: ¿qué hacemos con las componentes/autovalores nulos? ¿Devolvemos columnas con todo 0s? ¿O las eliminamos antes? ¿O no hacemos nada?
 
 3. Vary the parameters of the kernel and comment on the behavior of the projections onto the first two KPCA components for the different values considered (e.g. $\gamma \in \left\{0.02, 0.2, 2.0, 20.0, 200.0, 2000.0\right\}$). In particular,
     1. What is the behaviour in the limit in which the width of the kernel approaches $\infty$. Explain why one should expect such behavior.
     2. What is the behaviour in the limit in which the width of the kernel approaches $0$. Explain why one should expect such behavior.
 
+\section{Nyström approximation}
+
+2. Comment on the values of the error for the different approximations, and their dependence with the number of sampled features.
+3. (Extra point) Determine de dependence of the mean error with the number of features for the different random feature models. Provide an explanation of this behavior.
+
+\textbf{DUDA:} Qué hay que hacer exactamente con Xprime en Nystrom. Para qué sirve la función approximate_kernel_matrix? ¿No sería mejor que aceptara X y X_prime?
+
+\textbf{DUDA:} ¿Hay que entregar lo de mnist?
 
 \section*{Appendix: code developed}
-
-- kpca, animation
 
 \end{document}
