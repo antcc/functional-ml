@@ -53,6 +53,25 @@
 
 \maketitle
 
+\section{Kernel PCA}
 
+2. Why do the projections onto the first two KPCA principal components look different for the sklearn and our implementation? Is any of the two incorrect?
+
+Los vectores alpha tienen norma (l2) igual a 1 en $\mathbb R^N$, y se demuestra que si conseguimos que tengan norma (l2) $1/\sqrt{\lambda_i}$ entonces los autovectores $V_i$ definidos por $\alpha_i$ en el espacio $H$ tendrán norma-H igual a 1. Esto se reduce a dividir $\alpha_i/\sqrt{\lambda_i}$.
+
+Las dos representaciones mostradas son correctas, solo que una está usando los vectores alpha cambiados de signo (siempre hay dos posibilidades). Sklearn usa la función svd_flip para unificar la elección de signo (https://github.com/scikit-learn/scikit-learn/blob/15c2c72e27c6ea18566f4e786506c7a3aef8a5de/sklearn/utils/extmath.py#L504). El efecto visual es una simetría, ya que en este caso cambia solo el autovector correspondiente a la segunda componente principal.
+
+En PCA lineal no cambia por casualidad.
+
+**DUDA**: ¿qué hacemos con las componentes/autovalores nulos? ¿Devolvemos columnas con todo 0s? ¿O las eliminamos antes? ¿O no hacemos nada?
+
+3. Vary the parameters of the kernel and comment on the behavior of the projections onto the first two KPCA components for the different values considered (e.g. $\gamma \in \left\{0.02, 0.2, 2.0, 20.0, 200.0, 2000.0\right\}$). In particular,
+    1. What is the behaviour in the limit in which the width of the kernel approaches $\infty$. Explain why one should expect such behavior.
+    2. What is the behaviour in the limit in which the width of the kernel approaches $0$. Explain why one should expect such behavior.
+
+
+\section*{Appendix: code developed}
+
+- kpca, animation
 
 \end{document}

@@ -1,8 +1,11 @@
-import warnings
 from typing import Callable, Tuple
+import matplotlib
 
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as anim
 from scipy.spatial import distance
+from sklearn.utils.extmath import svd_flip
 
 
 def linear_kernel(
@@ -98,6 +101,7 @@ def kernel_pca(
     X: np.ndarray,
     X_test: np.ndarray,
     kernel: Callable,
+    flip: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Parameters
@@ -105,9 +109,12 @@ def kernel_pca(
     X:
         Data matrix
     X_test:
-        data matrix
+        Data matrix
     kernel:
-        kernel function
+        Kernel function
+    flip:
+        Whether to impose sklearn's deterministic
+        choice of normalized eigenvector signs.
 
     Returns
     -------
@@ -143,15 +150,10 @@ def kernel_pca(
     K_test = kernel(X_test, X)
     K_test_hat = compute_centered_gram_matrix(K, K_test)
 
-    """
-    NOTE: To follow sklearn's criterion and impose a deterministic
-    output when it comes to choosing the sign of the eigenvectors,
-    we would do the following:
-
-        from sklearn.utils.extmath import svd_flip
+    # Choose sign of eigenvectors in a deterministic way
+    if flip:
         alpha_eigenvecs, _ = svd_flip(alpha_eigenvecs,
-            np.zeros_like(alpha_eigenvecs).T)
-    """
+                                      np.zeros_like(alpha_eigenvecs).T)
 
     # RKHS normalization of eigenvectors, ignoring null components
     non_zero = np.flatnonzero(lambda_eigenvals)
@@ -162,3 +164,124 @@ def kernel_pca(
     X_test_hat = K_test_hat@alpha_eigenvecs[:, non_zero]
 
     return X_test_hat, lambda_eigenvals, alpha_eigenvecs
+
+
+class AnimationPCA:
+    """Display an animation of KPCA varying the
+       width parameter of an RBF kernel."""
+
+    def __init__(
+        self,
+        xlims: Tuple[float, float],
+        ylims: Tuple[float, float],
+        n_frames: int = 50,
+    ) -> None:
+        """
+        Set initial parameters for the animation.
+
+        Parameters
+        ----------
+        xlims:
+            Limits for the x-axis.
+        ylims:
+            Limits for the y-axis.
+        n_frames:
+            Number of frames (i.e. different parameter values).
+        """
+        self.n_frames = n_frames
+        self.gammas = 2 * np.logspace(-3, 4, n_frames)
+        self.A = 1.0
+        self.L = 1.0
+        self.xlims = xlims
+        self.ylims = ylims
+
+    def _init_plot(
+        self,
+        ax: matplotlib.axes.Axes,
+        gamma: float,
+    ) -> None:
+        """
+        Initialize axis labels, titles and limits.
+        Also clear any previous plots.
+        """
+        ax.clear()
+        ax.set_title(
+            r"Projection by KPCA ($\gamma=$" + f"{gamma:.3f})")
+        ax.set_xlabel(
+            r"1st principal component in space induced by $\phi$")
+        ax.set_ylabel("2nd principal component")
+        ax.set_xlim(self.xlims)
+        ax.set_ylim(self.ylims)
+
+    def _update_plot(
+        self,
+        i: int,
+        ax: matplotlib.axes.Axes,
+        X: np.ndarray,
+        X_test: np.ndarray,
+        reds: np.ndarray,
+        blues: np.ndarray,
+    ) -> None:
+        """
+        Update output in animation by advancing frames.
+
+        Parameters
+        -----------
+        i:
+            Frame number.
+        ax:
+            Axis in which to plot.
+        X:
+            Training data matrix.
+        X_test:
+            Test data matrix.
+        reds:
+            Boolean array of test data with label 0.
+        blues:
+            Boolean array of test data with label 1.
+        """
+        gamma = self.gammas[i]
+        self.L = np.sqrt(0.5 / gamma)
+        self._init_plot(ax, gamma)
+
+        X_kpca, _, _ = kernel_pca(X, X_test,
+                                  self.kernel,
+                                  flip=True)
+
+        ax.scatter(X_kpca[reds, 0], X_kpca[reds, 1], c="red",
+                   s=20, edgecolor='k')
+        ax.scatter(X_kpca[blues, 0], X_kpca[blues, 1], c="blue",
+                   s=20, edgecolor='k')
+
+    def animate(
+        self,
+        X: np.ndarray,
+        X_test: np.ndarray,
+        y_test: np.ndarray,
+    ) -> matplotlib.animation.FuncAnimation:
+        """
+        Make an animation with a given dataset.
+
+        Parameters
+        -----------
+        X:
+            Training data matrix.
+        X_test:
+            Test data matrix.
+        y_test:
+            Test data labels.
+        """
+        fig = plt.figure(figsize=(8, 5))
+        ax = fig.add_subplot(111)
+
+        def rbf(X, X_prime):
+            return rbf_kernel(X, X_prime, self.A, self.L)
+
+        self.kernel = rbf
+        reds = y_test == 0
+        blues = y_test == 1
+
+        return anim.FuncAnimation(fig, self._update_plot,
+                                  frames=self.n_frames,
+                                  repeat=False,
+                                  fargs=(ax, X, X_test, reds, blues,))
