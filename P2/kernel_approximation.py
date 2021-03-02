@@ -17,11 +17,10 @@ from typing import Callable, Optional, Union, Any
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.metrics.pairwise import rbf_kernel
 
-
-class RandomFeaturesSampler(ABC, BaseEstimator):
+class RandomFeaturesSampler(ABC, BaseEstimator, TransformerMixin):
     """ Base class for random feature samplers. """
 
     def __init__(self, n_components: int = 100) -> None:
@@ -37,7 +36,11 @@ class RandomFeaturesSampler(ABC, BaseEstimator):
         self.w = None
 
     @abstractmethod
-    def fit(self, n_features: int) -> None:
+    def fit(
+        self, 
+        X: np.darray,
+        y: np.darray = None,
+    ) -> None:
         """
         Initialize w's for the random features.
 
@@ -45,35 +48,17 @@ class RandomFeaturesSampler(ABC, BaseEstimator):
 
         Parameters
         ----------
-        n_features:
-            Number of original features of the data.
-        """
-        pass
-
-    def fit_transform(
-        self,
-        X: np.ndarray,
-        y: Any = None,
-    ) -> np.ndarray:
-        """
-        Initialize  w's (fit) and compute random features (transform).
-
-        Parameters
-        ----------
         X:
             Data matrix of shape (n_instances, n_features).
         y:
             Unused parameter for compatibility with sklearn's interface.
-
-        Returns
-        -------
-        Array of shape (n_instances, self.n_components).
         """
-        n_features = np.shape(X)[1]
-        self.fit(n_features)
-        return self.transform(X)
+        pass
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def transform(
+        self, 
+        X: np.ndarray
+        ) -> np.ndarray:
         """
         Compute the random features.
 
@@ -116,22 +101,51 @@ class RandomFeaturesSamplerRBF(RandomFeaturesSampler):
         self,
         n_components: int = 100,
         sigma: float = 1.0,
+        random_state: int = None,
     ) -> None:
-        super().__init__(n_components)
-        self.sigma = 1.0/sigma
+        """
+        Initialize a Random Features sampler based on RBF kernel.
 
-    def fit(self, n_features: int) -> RandomFeaturesSamplerRBF:
+        Parameters
+        ----------
+        n_components:
+            Number of random features to extract.
+        sigma:
+            Inverse of standard deviation. 
+            Cov = sigma^2*I
+        random_state: 
+            Random seed.
+        """
+
+        super().__init__(n_components)
+        self.sigma = sigma
+        self.random_state = random_state
+
+    def fit(
+        self, 
+        X: np.darray,
+        y: np.darray = None,
+        ) -> RandomFeaturesSamplerRBF:
         """
         Compute w's for the random RBF features.
 
         In this case, the RBF kernel is the characteristic function
         of a certain multivariate normal distribution.
+
+        Parameters
+        ----------
+        X:
+            Data matrix of shape (n_instances, n_features).
+        y:
+            Unused parameter for compatibility with sklearn's interface
+
         """
+        n_features = X.shape[1]
         w_mean = np.zeros(n_features)
         w_cov_matrix = self.sigma**2*np.identity(n_features)
 
         # Sample from multivariate normal distribution
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(seed = self.random_state)
         self.w = rng.multivariate_normal(
             w_mean,
             w_cov_matrix,
@@ -149,12 +163,33 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
         n_components: int = 100,
         scale: float = 1.0,
         nu: float = 1.0,
+        random_state: int = None
     ) -> None:
-        super().__init__(n_components)
-        self.scale = 1.0/scale
-        self.nu = 2.0*nu
+        """
+        Initialize a Random Features sampler based on Mattrn Kernel.
 
-    def fit(self, n_features: int) -> RandomFeaturesSamplerMatern:
+        Parameters
+        ----------
+        n_components:
+            Number of random features to extract.
+        scale:
+            Inverse of standard deviation.
+        nu:
+            Half of degrees of freedom of t-student distribution.
+        random_state: 
+            Random seed.
+
+        """
+        super().__init__(n_components)
+        self.scale = scale
+        self.nu = nu
+        self.random_state = random_state
+
+    def fit(
+        self, 
+        X: np.darray,
+        y: np.darray = None
+        ) -> RandomFeaturesSamplerMatern:
         """
         Compute w's for the random Matérn features.
 
@@ -166,7 +201,16 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
             (Adaptive Computation and Machine Learning). The MIT Press.
 
         [There is probably a mistake with the scale factor.]
+
+        Parameters
+        ----------
+        X:
+            Data matrix of shape (n_instances, n_features).
+        y:
+            Unused parameter for compatibility with sklearn's interface
         """
+        n_features = X.shape[1]
+
         # Scale of the Fourier transform of the kernel
         w_mean = np.zeros(n_features)
         w_cov_matrix = self.scale**2*np.identity(n_features)
@@ -177,6 +221,7 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
             w_cov_matrix,
             self.nu,
             self.n_components//2,
+            self.random_state
         )
 
         return self
@@ -187,6 +232,7 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
         cov_matrix: np.ndarray,
         df: float,
         n_samples: int,
+        random_state: int,
     ) -> np.ndarray:
         """
         Generate samples from a multivariate Student's t distribution.
@@ -203,6 +249,8 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
             Degrees of freedom.
         n_samples:
             Number of samples to generate.
+        random_state: 
+            Random seed.
 
         Returns
         -------
@@ -213,7 +261,7 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
         D = len(mean)
 
         # Formula for generating samples of a Student's t
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(random_state)
         x = rng.chisquare(df, n_samples)/df
         Z = rng.multivariate_normal(
             np.zeros(D),
@@ -225,13 +273,14 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
         return X
 
 
-class NystroemFeaturesSampler(BaseEstimator):
+class NystroemFeaturesSampler(BaseEstimator, TransformerMixin):
     """ Sample features following the Nyström method. """
 
     def __init__(
         self,
         n_components: int = 100,
         kernel: Callable[[np.ndarray, np.ndarray], np.ndarray] = rbf_kernel,
+        random_state: int = None
     ) -> None:
         """
         Initialize Nyström Features sampler.
@@ -242,9 +291,12 @@ class NystroemFeaturesSampler(BaseEstimator):
             Number of features to extract.
         kernel:
             Underlying kernel function.
+        random_state: 
+            Random seed.
         """
         self.n_components = n_components
         self.kernel = kernel
+        self.random_state = random_state
 
         # Initialize default values
         self.component_indices = None
@@ -255,6 +307,7 @@ class NystroemFeaturesSampler(BaseEstimator):
     def fit(
         self,
         X: np.ndarray,
+        y: np.darray = None
     ) -> NystroemFeaturesSampler:
         """
         Precompute auxiliary quantities for Nyström features.
@@ -262,7 +315,9 @@ class NystroemFeaturesSampler(BaseEstimator):
         Parameters
         ----------
         X:
-            Data matrix.
+            Data matrix of shape (n_instances, n_features).
+        y:
+            Unused parameter for compatibility with sklearn's interface
 
         Returns
         -------
@@ -271,10 +326,10 @@ class NystroemFeaturesSampler(BaseEstimator):
         """
         # Sample subset of training instances
         n_instances = len(X)
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(seed = self.random_state)
         self.component_indices = rng.choice(
             range(n_instances),
-            size=self.n_components,
+            size=min(n_instances, self.n_components),
             replace=False,
         )
         self.X_reduced = X[self.component_indices, :]
@@ -336,38 +391,14 @@ class NystroemFeaturesSampler(BaseEstimator):
         X_features = self.fit_transform(self.n_components, X)
         return X_features@X_features.T
 
-    def fit_transform(
+
+    def transform(
         self,
-        X: np.ndarray,
-        y: Any = None,
-        X_prime: Optional[np.ndarray] = None,
-    ) -> np.ndarray:
-        """
-        Fit model and compute Nyström features.
-
-        Use X as training data and compute features of X_prime.
-
-        Parameters
-        ----------
-        X:
-            Training data matrix.
-        y:
-            Unused parameter for compatibility with sklearn's interface.
-        X_prime:
-            Data matrix to compute Nyström features.
-        """
-        self.fit(X)
-        if X_prime is None:
-            X_prime = X
-        X_prime_nystroem = self.transform(X_prime)
-
-        return X_prime_nystroem
-
-    def transform(self, X_prime: np.ndarray) -> np.ndarray:
+        X: np.ndarray
+     ) -> np.ndarray:
         """Compute Nyström features using fitted quantities."""
-        J = self.kernel(X_prime, self.X_reduced)
-        X_prime_nystroem = J@self.sqrtm_pinv_reduced_kernel_matrix
-        return X_prime_nystroem
+        J = self.kernel(X, self.X_reduced)
+        return J@self.sqrtm_pinv_reduced_kernel_matrix
 
 
 def demo_kernel_approximation_features(
