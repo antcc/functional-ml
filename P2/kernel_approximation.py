@@ -12,18 +12,28 @@ Authors: <alberto.suarez@uam.es>
 from __future__ import annotations
 import warnings
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
+from sklearn.base import BaseEstimator
+from sklearn.metrics.pairwise import rbf_kernel
 
 
-class RandomFeaturesSampler(ABC):
+class RandomFeaturesSampler(ABC, BaseEstimator):
     """ Base class for random feature samplers. """
 
-    def __init__(self, n_random_features: int) -> None:
-        self.n_random_features = n_random_features
+    def __init__(self, n_components: int = 100) -> None:
+        """
+        Initialize a Random Features sampler.
+
+        Parameters
+        ----------
+        n_components:
+            Number of random features to extract.
+        """
+        self.n_components = n_components
         self.w = None
 
     @abstractmethod
@@ -40,29 +50,24 @@ class RandomFeaturesSampler(ABC):
         """
         pass
 
-    def set_params(self, **parameters):
-        for parameter, value in parameters.items():
-            setattr(self, parameter, value)
-        return self
-
     def fit_transform(
         self,
         X: np.ndarray,
-        y = None
+        y: Any = None,
     ) -> np.ndarray:
         """
         Initialize  w's (fit) and compute random features (transform).
 
         Parameters
         ----------
-        n_random_features:
-            Number of random features to sample.
         X:
             Data matrix of shape (n_instances, n_features).
+        y:
+            Unused parameter for compatibility with sklearn's interface.
 
         Returns
         -------
-        Array of shape (n_instances, self.n_random_features).
+        Array of shape (n_instances, self.n_components).
         """
         n_features = np.shape(X)[1]
         self.fit(n_features)
@@ -82,7 +87,7 @@ class RandomFeaturesSampler(ABC):
         Returns
         -------
         random_features:
-            Array of shape (n_instances, self.n_random_features).
+            Array of shape (n_instances, self.n_components).
         """
         if self.w is None:
             raise ValueError('Use fit_transform to initialize w.')
@@ -93,12 +98,12 @@ class RandomFeaturesSampler(ABC):
             raise ValueError('Different # of features for X and w.')
 
         # Monte Carlo approximation
-        random_features = np.empty((n_instances, self.n_random_features))
+        random_features = np.empty((n_instances, self.n_components))
         random_features[:, ::2] = np.cos(X@self.w.T)
         random_features[:, 1::2] = np.sin(X@self.w.T)
 
         # Normalize features
-        norm_factor = np.sqrt(self.n_random_features//2)
+        norm_factor = np.sqrt(self.n_components//2)
         random_features = random_features/norm_factor
 
         return random_features
@@ -107,9 +112,13 @@ class RandomFeaturesSampler(ABC):
 class RandomFeaturesSamplerRBF(RandomFeaturesSampler):
     """ Random Fourier Features for the RBF kernel. """
 
-    def __init__(self, sigma_kernel: float = 1, n_random_features: int = 1) -> None:
-        self.sigma = 1.0/sigma_kernel
-        super().__init__(n_random_features)
+    def __init__(
+        self,
+        n_components: int = 100,
+        sigma: float = 1.0,
+    ) -> None:
+        super().__init__(n_components)
+        self.sigma = 1.0/sigma
 
     def fit(self, n_features: int) -> RandomFeaturesSamplerRBF:
         """
@@ -126,7 +135,7 @@ class RandomFeaturesSamplerRBF(RandomFeaturesSampler):
         self.w = rng.multivariate_normal(
             w_mean,
             w_cov_matrix,
-            self.n_random_features//2,
+            self.n_components//2,
         )
 
         return self
@@ -135,10 +144,15 @@ class RandomFeaturesSamplerRBF(RandomFeaturesSampler):
 class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
     """ Random Fourier Features for the Matérn kernel. """
 
-    def __init__(self, length_scale: float = 1, nu: float = 1, n_random_features: int = 1) -> None:
-        self.scale = 1.0/length_scale
+    def __init__(
+        self,
+        n_components: int = 100,
+        scale: float = 1.0,
+        nu: float = 1.0,
+    ) -> None:
+        super().__init__(n_components)
+        self.scale = 1.0/scale
         self.nu = 2.0*nu
-        super().__init__(n_random_features)
 
     def fit(self, n_features: int) -> RandomFeaturesSamplerMatern:
         """
@@ -162,7 +176,7 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
             w_mean,
             w_cov_matrix,
             self.nu,
-            self.n_random_features//2,
+            self.n_components//2,
         )
 
         return self
@@ -211,14 +225,28 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
         return X
 
 
-class NystroemFeaturesSampler():
+class NystroemFeaturesSampler(BaseEstimator):
     """ Sample features following the Nyström method. """
 
     def __init__(
         self,
-        kernel: Callable[[np.ndarray, np.ndarray], np.ndarray],
+        n_components: int = 100,
+        kernel: Callable[[np.ndarray, np.ndarray], np.ndarray] = rbf_kernel,
     ) -> None:
+        """
+        Initialize Nyström Features sampler.
+
+        Parameters
+        ----------
+        n_components:
+            Number of features to extract.
+        kernel:
+            Underlying kernel function.
+        """
+        self.n_components = n_components
         self.kernel = kernel
+
+        # Initialize default values
         self.component_indices = None
         self.X_reduced = None
         self.reduced_kernel_matrix = None
@@ -227,7 +255,6 @@ class NystroemFeaturesSampler():
     def fit(
         self,
         X: np.ndarray,
-        n_features_sampled: int
     ) -> NystroemFeaturesSampler:
         """
         Precompute auxiliary quantities for Nyström features.
@@ -236,8 +263,6 @@ class NystroemFeaturesSampler():
         ----------
         X:
             Data matrix.
-        n_features_sampled:
-            Number of features to sample.
 
         Returns
         -------
@@ -249,7 +274,7 @@ class NystroemFeaturesSampler():
         rng = np.random.default_rng()
         self.component_indices = rng.choice(
             range(n_instances),
-            size=n_features_sampled,
+            size=self.n_components,
             replace=False,
         )
         self.X_reduced = X[self.component_indices, :]
@@ -295,7 +320,6 @@ class NystroemFeaturesSampler():
     def approximate_kernel_matrix(
         self,
         X: np.ndarray,
-        n_features_sampled: int,
     ) -> np.ndarray:
         """
         Approximate the kernel matrix k(X, X) using Nyström features.
@@ -304,20 +328,18 @@ class NystroemFeaturesSampler():
         ----------
         X:
             Data matrix.
-        n_features_sampled:
-            Number of features to sample.
 
         Returns
         -------
         Approximated kernel matrix.
         """
-        X_features = self.fit_transform(n_features_sampled, X)
+        X_features = self.fit_transform(self.n_components, X)
         return X_features@X_features.T
 
     def fit_transform(
         self,
-        n_features_sampled: int,
         X: np.ndarray,
+        y: Any = None,
         X_prime: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
@@ -327,14 +349,14 @@ class NystroemFeaturesSampler():
 
         Parameters
         ----------
-        n_features_sampled:
-            Number of features to sample.
         X:
             Training data matrix.
+        y:
+            Unused parameter for compatibility with sklearn's interface.
         X_prime:
             Data matrix to compute Nyström features.
         """
-        self.fit(X, n_features_sampled)
+        self.fit(X)
         if X_prime is None:
             X_prime = X
         X_prime_nystroem = self.transform(X_prime)
@@ -367,7 +389,8 @@ def demo_kernel_approximation_features(
     kernel:
         Kernel function that represents the kernel matrix to approximate.
     features_sampler:
-        Object representing the sampling strategy.
+        Object representing the sampling strategy initialized with the number
+        of features to extract.
     n_random_features:
         Array with a collection of numbers of random features to sample.
     """
@@ -389,7 +412,9 @@ def demo_kernel_approximation_features(
         # print('[Kernel approximation] # of features = ', n)
 
         # Get kernel matrix approximation
-        X_features = features_sampler.fit_transform(n, X)
+        X_features = features_sampler.set_params(
+            n_components=n
+        ).fit_transform(X)
         kernel_matrix_approx = X_features@X_features.T
 
         # Plot approximation
@@ -434,8 +459,8 @@ if __name__ == '__main__':
 
     # Nyström features
     n_nystroem_features = 20
-    nystroem_sampler = NystroemFeaturesSampler(kernel)
-    nystroem_features = nystroem_sampler.fit_transform(n_nystroem_features, X)
+    nystroem_sampler = NystroemFeaturesSampler(n_nystroem_features, kernel)
+    nystroem_features = nystroem_sampler.fit_transform(X)
     nystroem_features_grid = nystroem_sampler.transform(grid_X)
 
     # Classifier
@@ -470,11 +495,11 @@ if __name__ == '__main__':
 
     # Nyström features
     n_nystroem_features = [10, 100, 1000]
-    nystroem_features = NystroemFeaturesSampler(kernel)
+    nystroem_sampler = NystroemFeaturesSampler(n_nystroem_features, kernel)
 
     demo_kernel_approximation_features(
         X,
         kernel,
-        nystroem_features,
-        n_nystroem_features,
+        nystroem_sampler,
+        n_nystroem_features
     )

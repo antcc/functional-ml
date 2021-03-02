@@ -150,7 +150,7 @@ def kernel_pca(
 
     # Compute eigenvectors and eigenvalues (in ascending order)
     lambda_eigenvals, alpha_eigenvecs = np.linalg.eigh(K_hat)
-    tol = 1.0e-10
+    tol = 1.0e-8
     lambda_eigenvals[lambda_eigenvals < tol] = 0.0
 
     # Order eigenvalues and eigenvectors in descending order
