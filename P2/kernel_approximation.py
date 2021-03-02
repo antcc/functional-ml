@@ -22,8 +22,8 @@ import scipy as sp
 class RandomFeaturesSampler(ABC):
     """ Base class for random feature samplers. """
 
-    def __init__(self) -> None:
-        self.n_random_features = None
+    def __init__(self, n_random_features: int) -> None:
+        self.n_random_features = n_random_features
         self.w = None
 
     @abstractmethod
@@ -40,10 +40,15 @@ class RandomFeaturesSampler(ABC):
         """
         pass
 
+    def set_params(self, **parameters):
+        for parameter, value in parameters.items():
+            setattr(self, parameter, value)
+        return self
+
     def fit_transform(
         self,
-        n_random_features: int,
         X: np.ndarray,
+        y = None
     ) -> np.ndarray:
         """
         Initialize  w's (fit) and compute random features (transform).
@@ -59,7 +64,6 @@ class RandomFeaturesSampler(ABC):
         -------
         Array of shape (n_instances, self.n_random_features).
         """
-        self.n_random_features = n_random_features
         n_features = np.shape(X)[1]
         self.fit(n_features)
         return self.transform(X)
@@ -103,9 +107,9 @@ class RandomFeaturesSampler(ABC):
 class RandomFeaturesSamplerRBF(RandomFeaturesSampler):
     """ Random Fourier Features for the RBF kernel. """
 
-    def __init__(self, sigma_kernel: float) -> None:
+    def __init__(self, sigma_kernel: float = 1, n_random_features: int = 1) -> None:
         self.sigma = 1.0/sigma_kernel
-        super().__init__()
+        super().__init__(n_random_features)
 
     def fit(self, n_features: int) -> RandomFeaturesSamplerRBF:
         """
@@ -131,10 +135,10 @@ class RandomFeaturesSamplerRBF(RandomFeaturesSampler):
 class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
     """ Random Fourier Features for the Matérn kernel. """
 
-    def __init__(self, length_scale: float, nu: float) -> None:
+    def __init__(self, length_scale: float = 1, nu: float = 1, n_random_features: int = 1) -> None:
         self.scale = 1.0/length_scale
         self.nu = 2.0*nu
-        super().__init__()
+        super().__init__(n_random_features)
 
     def fit(self, n_features: int) -> RandomFeaturesSamplerMatern:
         """
