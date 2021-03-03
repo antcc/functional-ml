@@ -21,7 +21,7 @@
 \usepackage{sectsty}
 \usepackage{engord}
 \usepackage{parskip}
-\usepackage{minted}
+% \usepackage{minted}
 \usepackage{cite}
 \usepackage{graphicx}
 \usepackage{setspace}
@@ -31,7 +31,6 @@
 \usepackage{color}
 \usepackage{amsmath}
 \usepackage{bm}
-\usepackage{minted}
 \usepackage{subfigure}
 \usepackage{pdfpages}
 % \titlespacing*{\subsection}{0pt}{5.5ex}{3.3ex}
@@ -53,40 +52,55 @@
 
 \maketitle
 
-\section{Kernel PCA}
+\section{TODO}
 
-2. Why do the projections onto the first two KPCA principal components look different for the sklearn and our implementation? Is any of the two incorrect?
+Revisar cuaderno.
 
-Los vectores alpha tienen norma (l2) igual a 1 en $\mathbb R^N$, y se demuestra que si conseguimos que tengan norma (l2) $1/\sqrt{\lambda_i}$ entonces los autovectores $V_i$ definidos por $\alpha_i$ en el espacio $H$ tendrán norma-H igual a 1. Esto se reduce a dividir $\alpha_i/\sqrt{\lambda_i}$.
+Aclarar que eliminamos las componentes no nulas.
 
-Las dos representaciones mostradas son correctas, solo que una está usando los vectores alpha cambiados de signo (siempre hay dos posibilidades). Sklearn usa la función svd\_flip para unificar la elección de signo (\url{https://github.com/scikit-learn/scikit-learn/blob/15c2c72e27c6ea18566f4e786506c7a3aef8a5de/sklearn/utils/extmath.py#L504}). El efecto visual es una simetría, ya que en este caso cambia solo el autovector correspondiente a la segunda componente principal.
+\section*{Kernel PCA}
 
-En PCA lineal no cambia por casualidad.
+\emph{Why do the projections onto the first two KPCA principal components look different for the Sklearn and our implementation? Is any of the two incorrect?}
 
-\textbf{DUDA}: ¿qué hacemos con las componentes/autovalores nulos? ¿Devolvemos columnas con todo 0s? ¿O las eliminamos antes? ¿O no hacemos nada?
+Both representations are correct and valid, what makes them different is the decisions made at normalizing the eigenvectors. 
 
-3. Vary the parameters of the kernel and comment on the behavior of the projections onto the first two KPCA components for the different values considered (e.g. $\gamma \in \left\{0.02, 0.2, 2.0, 20.0, 200.0, 2000.0\right\}$). In particular,
+These vectors are returned with \(\|\cdot \|_{\mathcal{L}_2} = 1\) in \( \mathbb{R}^N \)  by Numpy and Scipy via specialized functions such as \texttt{eig} and \texttt{eigh} (version for symmetric cases). However, the kernel method needs these vectors to be unitary in the subjacent Hilbert space, not \( \mathbb{R}^N \). This can be achieved by ensuring that their \( \mathcal{L}_2 \)-norm in \( \mathbb{R}^N \)  equals the inverse of the square root of their corresponding eigenvalues \( 1/\sqrt{\lambda} \) . The procedure is then to divide each eigenvector by this quantity, and it is in this step that generates discrepancy, as one may divide by \( -1/\sqrt{\lambda} \) getting the same \( \mathcal{L}_2 \)-norm.
 
-    a) What is the behaviour in the limit in which the width of the kernel approaches $\infty$. Explain why one should expect such behavior.
+Sklearn's implementation uses an auxiliary function \texttt{svd\_flip} that deterministically assigns a sign for each normalized eigenvector (\href{https://github.com/scikit-learn/scikit-learn/blob/15c2c72e27c6ea18566f4e786506c7a3aef8a5de/sklearn/utils/extmath.py#L504}{reference}). 
 
-    b) What is the behaviour in the limit in which the width of the kernel approaches $0$. Explain why one should expect such behavior.
+We have implemented this option as a parameter for our function in order to reproduce Sklearn's output perfectly. In our case, not using this function leads to a reflection of the second principal component in the Kernel PCA function. Linear PCA does not show this behavior by pure coincidence.
 
-\section{Nyström approximation}
+\emph{Vary the parameters of the kernel and comment on the behavior of the projections onto the first two KPCA components for the different values considered (e.g. $\gamma \in \left\{0.02, 0.2, 2.0, 20.0, 200.0, 2000.0\right\}$. In particular,}
+\begin{enumerate}
+    \item \emph{What is the behaviour in the limit in which the width of the kernel approaches $\infty$. Explain why one should expect such behavior.}
+    \item \emph{What is the behaviour in the limit in which the width of the kernel approaches $0$. Explain why one should expect such behavior.}
+\end{enumerate}
 
-2. Comment on the values of the error for the different approximations, and their dependence with the number of sampled features.
+First of all, to study the limit behaviour of the projections we are using the explicit kernel formula:
+\[
+     \mathcal{K}(x, y) = Ae^{-\frac{\|x-y\|^{2}}{2 \omega^2}}, 
+\] 
+where \( A \) is the output variance and \( \omega \) is the kernel's width and \( \gamma \) is inversely proportional to \( \omega \) . Using this formula, and given two fixed input values \( x \) and \( y \),
+\[
+     \lim_{\gamma \to 0^{+}} = \lim_{\omega \to \infty} \mathcal{K}(x,y) = A.
+\]
 
-3. (Extra point) Determine de dependence of the mean error with the number of features for the different random feature models. Provide an explanation of this behavior.
+\[
+     \lim_{\gamma \to \infty} = \lim_{\omega \to 0^{+}} \mathcal{K}(x,y) = 0.
+\]
 
-\textbf{DUDA:} Qué hay que hacer exactamente con Xprime en Nystrom. Para qué sirve la función approximate\_kernel\_matrix? ¿No sería mejor que aceptara X y X\_prime?
+Using this theoretical results, increasing the value of gamma result in projecting all the datapoints into \( 0 \), and decreasing it 
 
-\textbf{DUDA:} ¿Hay que entregar lo de mnist?
+\section*{Nyström approximation}
+
+\emph{Comment on the values of the error for the different approximations, and their dependence with the number of sampled features.}
+
+\emph{(Extra point) Determine de dependence of the mean error with the number of features for the different random feature models. Provide an explanation of this behavior.}
+
 
 \section{CV}
 
 \textbf{DUDA:}¿adaptamos nuestro código para poder usarlo con sklearn? (heredar de BaseEstimator, pasar los parámetros en el constructor, que el fit sea fit de verdad, etc...)
-
-\section{TODO: añadir random_state a las cosas}
-
 
 \section*{References}
 

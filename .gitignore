@@ -11,3 +11,5 @@ __pycache__
 *.fdb_latexmk
 *.synctex.gz
 *.fls
+P2/main.bbl
+P2/main.blg

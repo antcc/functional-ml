@@ -161,6 +161,8 @@ def kernel_pca(
     K_test = kernel(X_test, X)
     K_test_hat = compute_centered_gram_matrix(K, K_test)
 
+    print(K_test_hat)
+
     # Choose sign of eigenvectors in a deterministic way
     if flip:
         alpha_eigenvecs, _ = svd_flip(alpha_eigenvecs,
@@ -170,6 +172,8 @@ def kernel_pca(
     non_zero = np.flatnonzero(lambda_eigenvals)
     alpha_eigenvecs[:, non_zero] = (alpha_eigenvecs[:, non_zero]
                                     / np.sqrt(lambda_eigenvals[non_zero]))
+    print(lambda_eigenvals)
+    print("a", alpha_eigenvecs)
 
     # Project principal components of non-zero eigenvalues
     X_test_hat = K_test_hat@alpha_eigenvecs[:, non_zero]
@@ -200,7 +204,7 @@ class AnimationKPCA:
             Number of frames (i.e. different parameter values).
         """
         self.n_frames = n_frames
-        self.gammas = 2 * np.logspace(-3, 4, n_frames)
+        self.gammas = 2 * np.logspace(2, 5, n_frames)
         self.A = 1.0
         self.L = 1.0
         self.xlims = xlims
