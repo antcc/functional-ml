@@ -33,6 +33,7 @@
 \usepackage{bm}
 \usepackage{subfigure}
 \usepackage{pdfpages}
+\usepackage{bm}
 % \titlespacing*{\subsection}{0pt}{5.5ex}{3.3ex}
 % \titlespacing*{\section}{0pt}{5.5ex}{1ex}
 \author{Luis Antonio Ortega Andrés\\Antonio Coín Castro}
@@ -88,15 +89,15 @@ We have implemented this option as a parameter for our function in order to repr
 
 \emph{Vary the parameters of the kernel and comment on the behavior of the projections onto the first two KPCA components for the different values considered (e.g. $\gamma \in \left\{0.02, 0.2, 2.0, 20.0, 200.0, 2000.0\right\}$. In particular,}
 \begin{enumerate}
-    \item \emph{What is the behaviour in the limit in which the width of the kernel approaches $\infty$. Explain why one should expect such behavior.}
-    \item \emph{What is the behaviour in the limit in which the width of the kernel approaches $0$. Explain why one should expect such behavior.}
+    \item \emph{What is the behavior in the limit in which the width of the kernel approaches $\infty$. Explain why one should expect such behavior.}
+    \item \emph{What is the behavior in the limit in which the width of the kernel approaches $0$. Explain why one should expect such behavior.}
 \end{enumerate}
 
-First of all, to study the limit behaviour of the projections we are using the explicit kernel formula:
+First of all, to study the limit behavior of the projections we are using the explicit kernel formula:
 \[
      \mathcal{K}(x, y) = Ae^{-\frac{\|x-y\|^{2}}{2 \omega^2}},
 \]
-where \( A \) is the output variance and \( \omega \) is the kernel's width and \( \gamma \) is inversely proportional to \( \omega \) . Using this formula, and given two fixed input values \( x \) and \( y \),
+where \( A \) is the output variance and \( \omega \) is the kernel's width and \( \gamma \) is inversely proportional to \( \omega \) . Using this formula, and given two fixed input values \( x \neq y \),
 \[
      \lim_{\gamma \to 0^{+}} = \lim_{\omega \to \infty} \mathcal{K}(x,y) = A.
 \]
@@ -104,6 +105,28 @@ where \( A \) is the output variance and \( \omega \) is the kernel's width and 
 \[
      \lim_{\gamma \to \infty} = \lim_{\omega \to 0^{+}} \mathcal{K}(x,y) = 0.
 \]
+
+Let us begin with the upper limit, in this case, the kernel tends to \( 0 \) on any pair of non equal points. This does not apply when computing \( \lim_{\gamma \to \infty} \mathcal{K}(x,x) \) as \( \mathcal{K}(x,x) = 1 \) is constant given any value of \( \gamma \). Given this situation and considering a set of points \( \bm{X} \), their kernel matrix converges to
+\[
+      \lim_{\gamma \to \infty} \mathcal{K}(\bm{X}, \bm{X}) = \bm{I}.
+\]
+This leads to the following situation: the application of the kernel to any set of points results in an identity matrix, which has all of its eigenvalues equal to \( 1 \) and its eigenvector to settle a base in \( \mathbb{R}^N \). There is no need for such base to be the usual base of \( \mathbb{R}^N \) but it does when using Numpy's \texttt{eigh} function.   
+
+As a result, the kernel method performs the following matrix operation:
+\[
+      \mathcal{K}(\bm{X}_{test}, \bm{X})\begin{pmatrix} e_1 & \dots & e_N \end{pmatrix} 
+\]
+
+Which would lead to a \( 0 \) matrix if \( \bm{X}_{test} \) and \( \bm{X} \) where disjoint. However, in our case, these matrix are equal, and their kernel a identity matrix:
+\[
+      \mathcal{K}(\bm{X}, \bm{X})\begin{pmatrix} e_1 & \dots & e_N \end{pmatrix} = \bm{I}\bm{I} =  \bm{I}.
+\]
+Given this, plotting a projection over the first two components leads to plotting a point in \( (1,0) \), a points in \( (0,1) \) and the rest in the origin. Which is what can be seen at the end of the animation.
+
+However, there is an interesting behaviour of the \texttt{eigh} function when its argument is near to an identity matrix but it is not. The returned eigenvalues are roughly equal to \( 1 \) and the eigenvector are nearly a base of \( \mathbb{R}^N \), but they are not the usual base (neither near). As a result, the plot leads to the projection over \( \mathbb{R}^2\) of a base in \( \mathbb{R}^N \), which corresponds to the ``spiked''  appearance of the projection.
+
+
+
 
 Using this theoretical results, increasing the value of gamma result in projecting all the datapoints into \( 0 \), and decreasing it
 
