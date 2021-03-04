@@ -73,15 +73,7 @@ En el notebook de CV:
 
 \section*{Kernel PCA}
 
-\emph{Why do the projections onto the first two KPCA principal components look different for the Sklearn and our implementation? Is any of the two incorrect?}
 
-Both representations are correct and valid, what makes them different is the decisions made at normalizing the eigenvectors.
-
-These vectors are returned with \(\|\cdot \|_{\mathcal{L}_2} = 1\) in \( \mathbb{R}^N \)  by Numpy and Scipy via specialized functions such as \texttt{eig} and \texttt{eigh} (version for symmetric cases). However, the kernel method needs these vectors to be unitary in the subjacent Hilbert space, not \( \mathbb{R}^N \). This can be achieved by ensuring that their \( \mathcal{L}_2 \)-norm in \( \mathbb{R}^N \)  equals the inverse of the square root of their corresponding eigenvalues \( 1/\sqrt{\lambda} \) . The procedure is then to divide each eigenvector by this quantity, and it is in this step that generates discrepancy, as one may divide by \( -1/\sqrt{\lambda} \) getting the same \( \mathcal{L}_2 \)-norm.
-
-Sklearn's implementation uses an auxiliary function \texttt{svd\_flip} that deterministically assigns a sign for each normalized eigenvector (\href{https://github.com/scikit-learn/scikit-learn/blob/15c2c72e27c6ea18566f4e786506c7a3aef8a5de/sklearn/utils/extmath.py#L504}{reference}).
-
-We have implemented this option as a parameter for our function in order to reproduce Sklearn's output perfectly. In our case, not using this function leads to a reflection of the second principal component in the Kernel PCA function. Linear PCA does not show this behavior by pure coincidence.
 
 \emph{Vary the parameters of the kernel and comment on the behavior of the projections onto the first two KPCA components for the different values considered (e.g. $\gamma \in \left\{0.02, 0.2, 2.0, 20.0, 200.0, 2000.0\right\}$. In particular,}
 \begin{enumerate}
@@ -89,46 +81,45 @@ We have implemented this option as a parameter for our function in order to repr
     \item \emph{What is the behavior in the limit in which the width of the kernel approaches $0$. Explain why one should expect such behavior.}
 \end{enumerate}
 
-First of all, to study the limit behavior of the projections we are using the explicit kernel formula:
+First of all, to study the limit behavior of the projections we are using the explicit RBF kernel formula:
 \[
-     \mathcal{K}(x, y) = Ae^{-\frac{\|x-y\|^{2}}{2 \omega^2}},
+     \mathcal{K}(x, y) = A\exp\left(-\frac{\|x-y\|^{2}}{2 \sigma^2}\right),
 \]
-where \( A \) is the output variance and \( \omega \) is the kernel's width and \( \gamma \) is inversely proportional to \( \omega \) . Using this formula, and given two fixed input values \( x \neq y \),
+where \( A \) is the output variance and \( \sigma \) is the kernel's width. In our case, $A=1.0$ and the parameter \( \gamma \) is inversely proportional to \( \sigma \). Using this formula, and given two fixed input values \( x \neq y \), we have:
 \[
-     \lim_{\gamma \to 0^{+}} = \lim_{\omega \to \infty} \mathcal{K}(x,y) = A.
-\]
-
-\[
-     \lim_{\gamma \to \infty} = \lim_{\omega \to 0^{+}} \mathcal{K}(x,y) = 0.
+     \lim_{\gamma \to 0^{+}} = \lim_{\sigma \to \infty} \mathcal{K}(x,y) = A=1.
 \]
 
-Let us begin with the upper limit, in this case, the kernel tends to \( 0 \) on any pair of non equal points. This does not apply when computing \( \lim_{\gamma \to \infty} \mathcal{K}(x,x) \) as \( \mathcal{K}(x,x) = 1 \) is constant given any value of \( \gamma \). Given this situation and considering a set of points \( \bm{X} \), their kernel matrix converges to
 \[
-      \lim_{\gamma \to \infty} \mathcal{K}(\bm{X}, \bm{X}) = \bm{I}.
-\]
-This leads to the following situation: the application of the kernel to any set of points results in an identity matrix, which has all of its eigenvalues equal to \( 1 \) and its eigenvector to settle a base in \( \mathbb{R}^N \). There is no need for such base to be the usual base of \( \mathbb{R}^N \) but it does when using Numpy's \texttt{eigh} function.
-
-As a result, the kernel method performs the following matrix operation:
-\[
-      \mathcal{K}(\bm{X}_{test}, \bm{X})\begin{pmatrix} e_1 & \dots & e_N \end{pmatrix}
+     \lim_{\gamma \to \infty} = \lim_{\sigma \to 0^{+}} \mathcal{K}(x,y) = 0.
 \]
 
-Which would lead to a \( 0 \) matrix if \( \bm{X}_{test} \) and \( \bm{X} \) where disjoint. However, in our case, these matrix are equal, and their kernel a identity matrix:
+Consider a generic set of points $\bm{X}$, with $N$ samples, and observe that in the code we only ever compute $\mathcal K(\bm X, \bm X)$, that is, the test set is the same as the training set.
+
+Let us begin by analyzing the first limit. In this case, if $x=y$ we have $\mathcal K(x,y)=A=1$ as well, so all in all we have:
+\[
+\lim_{\gamma\to0^+} \mathcal K(\bm X, \bm X) = \bm 1,
+\]
+where $\bm 1$ is a matrix with the same dimension as $K\equiv \mathcal K(\bm X, \bm X)$ containing all ones. Now observe that when we center this kernel, the expression in the limit is:
+\[
+\hat K = \bm 1 - (2/N)\bm 1 \bm 1 + (1/N^2)\bm 1 \bm 1 \bm 1 = \bm 0,
+\]
+that is, we get the null matrix. Then,....
+
+
+Next we consider the second case, where the kernel tends to \( 0 \) on any pair of non equal points. This does not apply when computing \( \lim_{\gamma \to \infty} \mathcal{K}(x,x) \), as \( \mathcal{K}(x,x) = 1 \) is constant for any given value of \( \gamma \). Considering this, the kernel matrix converges to
+\[
+      \lim_{\gamma \to \infty} \mathcal{K}(\bm{X}, \bm{X}) = \bm{I},
+\]
+where $\bm{I}$ is the identity matrix of order $N$. In this case, centering the kernel amounts to a small perturbation of $1/N$, so it can be ignored for our purposes. The situation in this case is this: the application of the kernel to any set of points results in an identity matrix, which has all of its eigenvalues equal to \( 1 \), and its eigenvector can be any orthonormal basis in \( \mathbb{R}^N \). There is no need for such base to be the usual basis of \( \mathbb{R}^N \), but it is the case when using Numpy's \texttt{eigh} function.
+
+As a result, the kernel method performs the following matrix operation in the limit:
 \[
       \mathcal{K}(\bm{X}, \bm{X})\begin{pmatrix} e_1 & \dots & e_N \end{pmatrix} = \bm{I}\bm{I} =  \bm{I}.
 \]
-Given this, plotting a projection over the first two components leads to plotting a point in \( (1,0) \), a points in \( (0,1) \) and the rest in the origin. Which is what can be seen at the end of the animation.
 
-However, there is an interesting behaviour of the \texttt{eigh} function when its argument is near to an identity matrix but it is not. The returned eigenvalues are roughly equal to \( 1 \) and the eigenvector are nearly a base of \( \mathbb{R}^N \), but they are not the usual base (neither near). As a result, the plot leads to the projection over \( \mathbb{R}^2\) of a base in \( \mathbb{R}^N \), which corresponds to the ``spiked''  appearance of the projection.
+Given this, plotting a projection over the first two principal components leads to the degenerate case of projecting a point in \( (1,0) \) and another point in \( (0,1) \), while the rest are mapped to the origin. This phenomenon can be seen if we set a large enough value of $\gamma$.
 
+However, there is an interesting behaviour of the \texttt{eigh} function when its argument is almost an identity matrix, but not exaclty. The returned eigenvalues are roughly equal to \( 1 \) and the eigenvectors are nearly an orthonormal basis of \( \mathbb{R}^N \), but they are not close to being the usual base. As a result, the plot leads to the projection over \( \mathbb{R}^2\) of a basis in \( \mathbb{R}^N \), which corresponds to the ``spiked''  appearance of the projection, in which the lines that are formed seem to be the projection of perpendicular axes from a higher dimensional space.
 
-
-
-Using this theoretical results, increasing the value of gamma result in projecting all the datapoints into \( 0 \), and decreasing it
-
-\section*{Nyström approximation}
-
-\emph{Comment on the values of the error for the different approximations, and their dependence with the number of sampled features.}
-
-\emph{(Extra point) Determine de dependence of the mean error with the number of features for the different random feature models. Provide an explanation of this behavior.}
 \end{document}

@@ -159,12 +159,13 @@ def kernel_pca(
     Returns
     -------
     X_test_hat:
-        Projection of X_test on the principal components
+        Projection of X_test on the principal components corresponding
+        to non-zero eigenvalues.
     lambda_eigenvals:
-        Eigenvalues of the centered kernel
+        Eigenvalues of the centered kernel.
     alpha_eigenvecs:
         Principal components. These are the eigenvectors
-        of the centered kernel with the RKHS normalization
+        of the centered kernel with the RKHS normalization.
 
     Notes
     -------
