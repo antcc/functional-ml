@@ -54,19 +54,35 @@
 
 \section{TODO}
 
-Revisar cuaderno.
+Contestar preguntas en notebook (y eliminar este pdf).
 
-Aclarar que eliminamos las componentes no nulas.
+Pasar .pys a pdf.
+
+Añadir referencias (documentación sklearn, paper PCA?) en formato Chicago.
+
+Aclarar que eliminamos las componentes no nulas en KPCA.
+
+Añadir gráficas sobre cómo es KPCA según gamma->0 o gamma->inf (están en la carpeta /img) (?)
+
+En el notebook de CV:
+
+- Comentar gráfica.
+
+- Comentar mejores parámetros y resultado en test.
+
+- Añadir gamma y nu,scale en Nyström en cv.
+
+\textbf{DUDA:} En Random Features, n\_components tiene que ser par (?). Cómo hacemos para pintar bien la gráfica del error? (ahora mismo np.repeat)
 
 \section*{Kernel PCA}
 
 \emph{Why do the projections onto the first two KPCA principal components look different for the Sklearn and our implementation? Is any of the two incorrect?}
 
-Both representations are correct and valid, what makes them different is the decisions made at normalizing the eigenvectors. 
+Both representations are correct and valid, what makes them different is the decisions made at normalizing the eigenvectors.
 
 These vectors are returned with \(\|\cdot \|_{\mathcal{L}_2} = 1\) in \( \mathbb{R}^N \)  by Numpy and Scipy via specialized functions such as \texttt{eig} and \texttt{eigh} (version for symmetric cases). However, the kernel method needs these vectors to be unitary in the subjacent Hilbert space, not \( \mathbb{R}^N \). This can be achieved by ensuring that their \( \mathcal{L}_2 \)-norm in \( \mathbb{R}^N \)  equals the inverse of the square root of their corresponding eigenvalues \( 1/\sqrt{\lambda} \) . The procedure is then to divide each eigenvector by this quantity, and it is in this step that generates discrepancy, as one may divide by \( -1/\sqrt{\lambda} \) getting the same \( \mathcal{L}_2 \)-norm.
 
-Sklearn's implementation uses an auxiliary function \texttt{svd\_flip} that deterministically assigns a sign for each normalized eigenvector (\href{https://github.com/scikit-learn/scikit-learn/blob/15c2c72e27c6ea18566f4e786506c7a3aef8a5de/sklearn/utils/extmath.py#L504}{reference}). 
+Sklearn's implementation uses an auxiliary function \texttt{svd\_flip} that deterministically assigns a sign for each normalized eigenvector (\href{https://github.com/scikit-learn/scikit-learn/blob/15c2c72e27c6ea18566f4e786506c7a3aef8a5de/sklearn/utils/extmath.py#L504}{reference}).
 
 We have implemented this option as a parameter for our function in order to reproduce Sklearn's output perfectly. In our case, not using this function leads to a reflection of the second principal component in the Kernel PCA function. Linear PCA does not show this behavior by pure coincidence.
 
@@ -78,8 +94,8 @@ We have implemented this option as a parameter for our function in order to repr
 
 First of all, to study the limit behaviour of the projections we are using the explicit kernel formula:
 \[
-     \mathcal{K}(x, y) = Ae^{-\frac{\|x-y\|^{2}}{2 \omega^2}}, 
-\] 
+     \mathcal{K}(x, y) = Ae^{-\frac{\|x-y\|^{2}}{2 \omega^2}},
+\]
 where \( A \) is the output variance and \( \omega \) is the kernel's width and \( \gamma \) is inversely proportional to \( \omega \) . Using this formula, and given two fixed input values \( x \) and \( y \),
 \[
      \lim_{\gamma \to 0^{+}} = \lim_{\omega \to \infty} \mathcal{K}(x,y) = A.
@@ -89,25 +105,11 @@ where \( A \) is the output variance and \( \omega \) is the kernel's width and 
      \lim_{\gamma \to \infty} = \lim_{\omega \to 0^{+}} \mathcal{K}(x,y) = 0.
 \]
 
-Using this theoretical results, increasing the value of gamma result in projecting all the datapoints into \( 0 \), and decreasing it 
+Using this theoretical results, increasing the value of gamma result in projecting all the datapoints into \( 0 \), and decreasing it
 
 \section*{Nyström approximation}
 
 \emph{Comment on the values of the error for the different approximations, and their dependence with the number of sampled features.}
 
 \emph{(Extra point) Determine de dependence of the mean error with the number of features for the different random feature models. Provide an explanation of this behavior.}
-
-
-\section{CV}
-
-\textbf{DUDA:}¿adaptamos nuestro código para poder usarlo con sklearn? (heredar de BaseEstimator, pasar los parámetros en el constructor, que el fit sea fit de verdad, etc...)
-
-\section*{References}
-
-Formato Chicago de todos los trabajos consultados + sklearn.
-
-\section*{Appendix: code developed}
-
-\textbf{DUDA:} ¿Qué código hay que poner aquí?
-
 \end{document}

@@ -12,13 +12,15 @@ Authors: <alberto.suarez@uam.es>
 from __future__ import annotations
 import warnings
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Union, Any
+from typing import Callable, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
+
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.metrics.pairwise import rbf_kernel
+
 
 class RandomFeaturesSampler(ABC, BaseEstimator, TransformerMixin):
     """ Base class for random feature samplers. """
@@ -30,16 +32,18 @@ class RandomFeaturesSampler(ABC, BaseEstimator, TransformerMixin):
         Parameters
         ----------
         n_components:
-            Number of random features to extract.
+            Number of random features to extract. Must be even.
         """
         self.n_components = n_components
+
+        # Initialize default values
         self.w = None
 
     @abstractmethod
     def fit(
-        self, 
+        self,
         X: np.darray,
-        y: np.darray = None,
+        y: Optional[np.darray] = None,
     ) -> None:
         """
         Initialize w's for the random features.
@@ -56,9 +60,9 @@ class RandomFeaturesSampler(ABC, BaseEstimator, TransformerMixin):
         pass
 
     def transform(
-        self, 
-        X: np.ndarray
-        ) -> np.ndarray:
+        self,
+        X: np.ndarray,
+    ) -> np.ndarray:
         """
         Compute the random features.
 
@@ -75,7 +79,7 @@ class RandomFeaturesSampler(ABC, BaseEstimator, TransformerMixin):
             Array of shape (n_instances, self.n_components).
         """
         if self.w is None:
-            raise ValueError('Use fit_transform to initialize w.')
+            raise ValueError('Use fit to initialize w.')
 
         n_instances, n_features = np.shape(X)
 
@@ -101,31 +105,30 @@ class RandomFeaturesSamplerRBF(RandomFeaturesSampler):
         self,
         n_components: int = 100,
         sigma: float = 1.0,
-        random_state: int = None,
+        random_state: Optional[int] = None,
     ) -> None:
         """
-        Initialize a Random Features sampler based on RBF kernel.
+        Initialize a Random Features sampler based on a RBF kernel.
 
         Parameters
         ----------
         n_components:
             Number of random features to extract.
         sigma:
-            Inverse of standard deviation. 
-            Cov = sigma^2*I
-        random_state: 
+            Standard deviation of RBF kernel. The covariance matrix will
+            be Cov = (1.0/sigma^2)*I.
+        random_state:
             Random seed.
         """
-
         super().__init__(n_components)
         self.sigma = sigma
         self.random_state = random_state
 
     def fit(
-        self, 
+        self,
         X: np.darray,
-        y: np.darray = None,
-        ) -> RandomFeaturesSamplerRBF:
+        y: Optional[np.darray] = None,
+    ) -> RandomFeaturesSamplerRBF:
         """
         Compute w's for the random RBF features.
 
@@ -137,15 +140,19 @@ class RandomFeaturesSamplerRBF(RandomFeaturesSampler):
         X:
             Data matrix of shape (n_instances, n_features).
         y:
-            Unused parameter for compatibility with sklearn's interface
+            Unused parameter for compatibility with sklearn's interface.
 
+        Returns
+        -------
+        self:
+            The instance itself.
         """
         n_features = X.shape[1]
         w_mean = np.zeros(n_features)
-        w_cov_matrix = self.sigma**2*np.identity(n_features)
+        w_cov_matrix = (1.0/self.sigma**2)*np.identity(n_features)
 
         # Sample from multivariate normal distribution
-        rng = np.random.default_rng(seed = self.random_state)
+        rng = np.random.default_rng(seed=self.random_state)
         self.w = rng.multivariate_normal(
             w_mean,
             w_cov_matrix,
@@ -163,22 +170,21 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
         n_components: int = 100,
         scale: float = 1.0,
         nu: float = 1.0,
-        random_state: int = None
+        random_state: Optional[int] = None,
     ) -> None:
         """
-        Initialize a Random Features sampler based on Mattrn Kernel.
+        Initialize a Random Features sampler based on a Matérn Kernel.
 
         Parameters
         ----------
         n_components:
             Number of random features to extract.
         scale:
-            Inverse of standard deviation.
+            Length scale of the Matérn kernel.
         nu:
-            Half of degrees of freedom of t-student distribution.
-        random_state: 
+            Degrees of freedom of the Matérn kernel.
+        random_state:
             Random seed.
-
         """
         super().__init__(n_components)
         self.scale = scale
@@ -186,10 +192,10 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
         self.random_state = random_state
 
     def fit(
-        self, 
+        self,
         X: np.darray,
-        y: np.darray = None
-        ) -> RandomFeaturesSamplerMatern:
+        y: np.darray = Optional[None],
+    ) -> RandomFeaturesSamplerMatern:
         """
         Compute w's for the random Matérn features.
 
@@ -207,70 +213,77 @@ class RandomFeaturesSamplerMatern(RandomFeaturesSampler):
         X:
             Data matrix of shape (n_instances, n_features).
         y:
-            Unused parameter for compatibility with sklearn's interface
+            Unused parameter for compatibility with sklearn's interface.
+
+        Returns
+        -------
+        self:
+            The instance itself.
         """
         n_features = X.shape[1]
 
         # Scale of the Fourier transform of the kernel
         w_mean = np.zeros(n_features)
-        w_cov_matrix = self.scale**2*np.identity(n_features)
+        w_cov_matrix = (1.0/self.scale**2)*np.identity(n_features)
 
         # Sample from multivariate student t distribution
-        self.w = self._random_multivariate_student_t(
+        self.w = random_multivariate_student_t(
             w_mean,
             w_cov_matrix,
-            self.nu,
+            2.0*self.nu,
             self.n_components//2,
             self.random_state
         )
 
         return self
 
-    def _random_multivariate_student_t(
-        self,
-        mean: np.ndarray,
-        cov_matrix: np.ndarray,
-        df: float,
-        n_samples: int,
-        random_state: int,
-    ) -> np.ndarray:
-        """
-        Generate samples from a multivariate Student's t distribution.
 
-            (Ref.) https://en.wikipedia.org/wiki/Multivariate_t-distribution
+def random_multivariate_student_t(
+    mean: np.ndarray,
+    cov_matrix: np.ndarray,
+    df: float,
+    n_samples: int,
+    random_state: Optional[int] = None,
+) -> np.ndarray:
+    """
+    Generate samples from a multivariate Student's t distribution.
 
-        Parameters
-        ----------
-        mean:
-            Mean vector of the distribution.
-        cov_matrix:
-            Covariance matrix of the distribution.
-        df:
-            Degrees of freedom.
-        n_samples:
-            Number of samples to generate.
-        random_state: 
-            Random seed.
+        (Ref.) https://en.wikipedia.org/wiki/Multivariate_t-distribution
 
-        Returns
-        -------
-        X:
-            Array of shape (n_samples, len(mean)) with the generated samples.
-        """
-        # Dimensions of multivariate Student's t distribution.
-        D = len(mean)
+    This is a helper function for the RandomFeaturesSamplerMatern class.
 
-        # Formula for generating samples of a Student's t
-        rng = np.random.default_rng(random_state)
-        x = rng.chisquare(df, n_samples)/df
-        Z = rng.multivariate_normal(
-            np.zeros(D),
-            cov_matrix,
-            n_samples,
-        )
-        X = mean + Z/np.sqrt(x)[:, np.newaxis]
+    Parameters
+    ----------
+    mean:
+        Mean vector of the distribution.
+    cov_matrix:
+        Covariance matrix of the distribution.
+    df:
+        Degrees of freedom.
+    n_samples:
+        Number of samples to generate.
+    random_state:
+        Random seed.
 
-        return X
+    Returns
+    -------
+    X:
+        Array of shape (n_samples, len(mean)) with the generated samples.
+    """
+    # Dimensions of multivariate Student's t distribution.
+    D = len(mean)
+
+    # Formula for generating samples of a Student's t
+    rng = np.random.default_rng(seed=random_state)
+    x = rng.chisquare(df, n_samples)/df
+    Z = rng.multivariate_normal(
+        np.zeros(D),
+        cov_matrix,
+        n_samples,
+    )
+    X = mean + Z/np.sqrt(x)[:, np.newaxis]
+
+    return X
 
 
 class NystroemFeaturesSampler(BaseEstimator, TransformerMixin):
@@ -280,7 +293,7 @@ class NystroemFeaturesSampler(BaseEstimator, TransformerMixin):
         self,
         n_components: int = 100,
         kernel: Callable[[np.ndarray, np.ndarray], np.ndarray] = rbf_kernel,
-        random_state: int = None
+        random_state: Optional[int] = None,
     ) -> None:
         """
         Initialize Nyström Features sampler.
@@ -291,7 +304,7 @@ class NystroemFeaturesSampler(BaseEstimator, TransformerMixin):
             Number of features to extract.
         kernel:
             Underlying kernel function.
-        random_state: 
+        random_state:
             Random seed.
         """
         self.n_components = n_components
@@ -307,29 +320,39 @@ class NystroemFeaturesSampler(BaseEstimator, TransformerMixin):
     def fit(
         self,
         X: np.ndarray,
-        y: np.darray = None
+        y: Optional[np.darray] = None,
     ) -> NystroemFeaturesSampler:
         """
-        Precompute auxiliary quantities for Nyström features.
+        Precompute auxiliary matrix (W+)^1/2 for Nyström features.
 
         Parameters
         ----------
         X:
-            Data matrix of shape (n_instances, n_features).
+            Data matrix of shape (n_instances, n_features), ideally
+            verifying that n_features >= self.n_components.
         y:
-            Unused parameter for compatibility with sklearn's interface
+            Unused parameter for compatibility with sklearn's interface.
 
         Returns
         -------
         self:
             The instance itself.
         """
-        # Sample subset of training instances
         n_instances = len(X)
-        rng = np.random.default_rng(seed = self.random_state)
+        if self.n_components > n_instances:
+            n_components = n_instances
+            warnings.warn("n_components > n_samples, so n_components was set"
+                          "to n_samples, which results in an inefficient"
+                          " evaluation of the full kernel.")
+
+        else:
+            n_components = self.n_components
+
+        # Sample subset of training instances
+        rng = np.random.default_rng(seed=self.random_state)
         self.component_indices = rng.choice(
             range(n_instances),
-            size=min(n_instances, self.n_components),
+            size=n_components,
             replace=False,
         )
         self.X_reduced = X[self.component_indices, :]
@@ -375,9 +398,35 @@ class NystroemFeaturesSampler(BaseEstimator, TransformerMixin):
     def approximate_kernel_matrix(
         self,
         X: np.ndarray,
+        X_prime: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
-        Approximate the kernel matrix k(X, X) using Nyström features.
+        Approximate a kernel matrix using Nyström features.
+
+        Parameters
+        ----------
+        X:
+            Data matrix of shape (N, D).
+        X_prime:
+            Optional data matrix of shape (L, D).
+
+        Returns
+        -------
+        The approximated kernel matrix of k(X_prime, X) if X_prime is
+        present, or else the approximated kernel matrix of k(X, X).
+        """
+        if X_prime is None:
+            X_prime = X
+        X_features = self.fit_transform(X)
+        X_prime_features = self.transform(X_prime)
+        return X_prime_features@X_features.T
+
+    def transform(
+        self,
+        X: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Compute Nyström features using fitted quantities.
 
         Parameters
         ----------
@@ -386,17 +435,8 @@ class NystroemFeaturesSampler(BaseEstimator, TransformerMixin):
 
         Returns
         -------
-        Approximated kernel matrix.
+        Array of Nyström features of X.
         """
-        X_features = self.fit_transform(self.n_components, X)
-        return X_features@X_features.T
-
-
-    def transform(
-        self,
-        X: np.ndarray
-     ) -> np.ndarray:
-        """Compute Nyström features using fitted quantities."""
         J = self.kernel(X, self.X_reduced)
         return J@self.sqrtm_pinv_reduced_kernel_matrix
 
@@ -467,6 +507,54 @@ def demo_kernel_approximation_features(
     plt.show()
 
 
+def plot_mean_approx_err(
+    X: np.ndarray,
+    kernel: Callable[[np.ndarray, np.ndarray], np.ndarray],
+    features_sampler: Union[RandomFeaturesSampler, NystroemFeaturesSampler],
+    max_features: int,
+    start: int = 2,
+    step: int = 2,
+) -> None:
+    """
+    Explore the dependence of mean approximation error w.r.t number of features.
+
+    Parameters
+    ----------
+    X:
+        Data matrix.
+    kernel:
+        Kernel function that represents the kernel matrix to approximate.
+    features_sampler:
+        Object representing the sampling strategy initialized with the number
+        of features to extract.
+    max_features:
+        Sets the final number of random features.
+    start:
+        Sets the initial number of random features.
+    step:
+        Controls how the number of features increases on each iteration.
+    """
+    K = kernel(X, X)
+    mean_errs = []
+
+    # Compute array of mean approximation errors for each n
+    for n in range(start, max_features + 1, step):
+        X_features = features_sampler.set_params(
+            n_components=n
+        ).fit_transform(X)
+        K_hat = X_features@X_features.T
+
+        mean_errs.append(np.mean(np.abs(K - K_hat)))
+
+    # Plot error vs n_components
+    plt.figure(figsize=(7, 4))
+    plt.title("Evolution of mean approximation error")
+    plt.xlabel("n_features_sampled")
+    plt.ylabel("mean absolute error")
+    plt.plot(np.repeat(mean_errs, step))  # visualization trick
+    plt.show()
+
+
 if __name__ == '__main__':
     """
     from sklearn import datasets, svm
@@ -518,7 +606,7 @@ if __name__ == '__main__':
 
     # Kernel parameters
     sigma = 1.0
-    gamma = 1.0 / (2.0 * sigma**2)
+    gamma = 1.0/(2.0*sigma**2)
 
     # Kernel function
     def kernel(X, Y):

@@ -9,13 +9,14 @@ Authors: <alberto.suarez@uam.es>
          Antonio Coín Castro
 """
 
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 import matplotlib
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as anim
 from scipy.spatial import distance
+
 from sklearn.utils.extmath import svd_flip
 
 
@@ -23,6 +24,18 @@ def linear_kernel(
     X: np.ndarray,
     X_prime: np.ndarray,
 ) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    X:
+        Data matrix
+    X_prime:
+        Data matrix
+
+    Returns
+    -------
+    kernel matrix
+    """
     return X@X_prime.T
 
 
@@ -32,6 +45,22 @@ def exponential_kernel(
     A: float,
     ls: float,
 ) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    X:
+        Data matrix
+    X_prime:
+        Data matrix
+    A:
+        Output variance
+    ls:
+        Kernel lengthscale
+
+    Returns
+    -------
+    kernel matrix
+    """
     d = distance.cdist(X, X_prime, metric='minkowski', p=1.0)
     return A*np.exp(-d/ls)
 
@@ -80,7 +109,7 @@ def rbf_kernel(
 
 def compute_centered_gram_matrix(
     K1: np.ndarray,
-    K2: np.ndarray = None,
+    K2: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """
     Compute Gram matrix of centered kernel.
@@ -150,8 +179,9 @@ def kernel_pca(
 
     # Compute eigenvectors and eigenvalues (in ascending order)
     lambda_eigenvals, alpha_eigenvecs = np.linalg.eigh(K_hat)
-    tol = 1.0e-8
-    lambda_eigenvals[lambda_eigenvals < tol] = 0.0
+
+    # Set negligible eigenvalues to zero
+    lambda_eigenvals[lambda_eigenvals < 1.0e-6] = 0.0
 
     # Order eigenvalues and eigenvectors in descending order
     lambda_eigenvals = lambda_eigenvals[::-1]
@@ -160,8 +190,6 @@ def kernel_pca(
     # Compute (centered) projection matrix
     K_test = kernel(X_test, X)
     K_test_hat = compute_centered_gram_matrix(K, K_test)
-
-    print(K_test_hat)
 
     # Choose sign of eigenvectors in a deterministic way
     if flip:
@@ -172,8 +200,6 @@ def kernel_pca(
     non_zero = np.flatnonzero(lambda_eigenvals)
     alpha_eigenvecs[:, non_zero] = (alpha_eigenvecs[:, non_zero]
                                     / np.sqrt(lambda_eigenvals[non_zero]))
-    print(lambda_eigenvals)
-    print("a", alpha_eigenvecs)
 
     # Project principal components of non-zero eigenvalues
     X_test_hat = K_test_hat@alpha_eigenvecs[:, non_zero]
@@ -204,7 +230,7 @@ class AnimationKPCA:
             Number of frames (i.e. different parameter values).
         """
         self.n_frames = n_frames
-        self.gammas = 2 * np.logspace(2, 5, n_frames)
+        self.gammas = 2 * np.logspace(-3, 4, n_frames)
         self.A = 1.0
         self.L = 1.0
         self.xlims = xlims
