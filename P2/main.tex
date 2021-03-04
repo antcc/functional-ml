@@ -71,10 +71,6 @@ En el notebook de CV:
 
 - Comentar mejores parámetros y resultado en test.
 
-- Añadir gamma y nu,scale en Nyström en cv.
-
-\textbf{DUDA:} En Random Features, n\_components tiene que ser par (?). Cómo hacemos para pintar bien la gráfica del error? (ahora mismo np.repeat)
-
 \section*{Kernel PCA}
 
 \emph{Why do the projections onto the first two KPCA principal components look different for the Sklearn and our implementation? Is any of the two incorrect?}
@@ -110,11 +106,11 @@ Let us begin with the upper limit, in this case, the kernel tends to \( 0 \) on 
 \[
       \lim_{\gamma \to \infty} \mathcal{K}(\bm{X}, \bm{X}) = \bm{I}.
 \]
-This leads to the following situation: the application of the kernel to any set of points results in an identity matrix, which has all of its eigenvalues equal to \( 1 \) and its eigenvector to settle a base in \( \mathbb{R}^N \). There is no need for such base to be the usual base of \( \mathbb{R}^N \) but it does when using Numpy's \texttt{eigh} function.   
+This leads to the following situation: the application of the kernel to any set of points results in an identity matrix, which has all of its eigenvalues equal to \( 1 \) and its eigenvector to settle a base in \( \mathbb{R}^N \). There is no need for such base to be the usual base of \( \mathbb{R}^N \) but it does when using Numpy's \texttt{eigh} function.
 
 As a result, the kernel method performs the following matrix operation:
 \[
-      \mathcal{K}(\bm{X}_{test}, \bm{X})\begin{pmatrix} e_1 & \dots & e_N \end{pmatrix} 
+      \mathcal{K}(\bm{X}_{test}, \bm{X})\begin{pmatrix} e_1 & \dots & e_N \end{pmatrix}
 \]
 
 Which would lead to a \( 0 \) matrix if \( \bm{X}_{test} \) and \( \bm{X} \) where disjoint. However, in our case, these matrix are equal, and their kernel a identity matrix:

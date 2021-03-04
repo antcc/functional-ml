@@ -230,7 +230,7 @@ class AnimationKPCA:
             Number of frames (i.e. different parameter values).
         """
         self.n_frames = n_frames
-        self.gammas = 2 * np.logspace(-3, 4, n_frames)
+        self.gammas = 2*np.logspace(-3, 4, n_frames)
         self.A = 1.0
         self.L = 1.0
         self.xlims = xlims
@@ -282,7 +282,7 @@ class AnimationKPCA:
             Boolean array of test data with label 1.
         """
         gamma = self.gammas[i]
-        self.L = np.sqrt(0.5 / gamma)
+        self.L = np.sqrt(0.5/gamma)
         self._init_plot(ax, gamma)
 
         X_kpca, _, _ = kernel_pca(X, X_test,

@@ -19,7 +19,7 @@ import numpy as np
 import scipy as sp
 
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.metrics.pairwise import rbf_kernel
+from sklearn.gaussian_process.kernels import RBF
 
 
 class RandomFeaturesSampler(ABC, BaseEstimator, TransformerMixin):
@@ -292,7 +292,7 @@ class NystroemFeaturesSampler(BaseEstimator, TransformerMixin):
     def __init__(
         self,
         n_components: int = 100,
-        kernel: Callable[[np.ndarray, np.ndarray], np.ndarray] = rbf_kernel,
+        kernel: Callable[[np.ndarray, np.ndarray], np.ndarray] = RBF(),
         random_state: Optional[int] = None,
     ) -> None:
         """
@@ -514,7 +514,7 @@ def plot_mean_approx_err(
     max_features: int,
     start: int = 2,
     step: int = 2,
-) -> None:
+) -> np.ndarray:
     """
     Explore the dependence of mean approximation error w.r.t number of features.
 
@@ -533,12 +533,18 @@ def plot_mean_approx_err(
         Sets the initial number of random features.
     step:
         Controls how the number of features increases on each iteration.
+
+    Returns
+    -------
+    features_range:
+        Array with all the number of random features tried.
     """
     K = kernel(X, X)
     mean_errs = []
+    features_range = np.arange(start, max_features + 1, step)
 
     # Compute array of mean approximation errors for each n
-    for n in range(start, max_features + 1, step):
+    for n in features_range:
         X_features = features_sampler.set_params(
             n_components=n
         ).fit_transform(X)
@@ -551,8 +557,9 @@ def plot_mean_approx_err(
     plt.title("Evolution of mean approximation error")
     plt.xlabel("n_features_sampled")
     plt.ylabel("mean absolute error")
-    plt.plot(np.repeat(mean_errs, step))  # visualization trick
-    plt.show()
+    plt.plot(features_range, mean_errs, label="Empirical error")
+
+    return features_range
 
 
 if __name__ == '__main__':
