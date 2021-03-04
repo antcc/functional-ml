@@ -104,7 +104,19 @@ where $\bm 1$ is a matrix with the same dimension as $K\equiv \mathcal K(\bm X, 
 \[
 \hat K = \bm 1 - (2/N)\bm 1 \bm 1 + (1/N^2)\bm 1 \bm 1 \bm 1 = \bm 0,
 \]
-that is, we get the null matrix. Then,....
+that is, we get the null matrix. As a result, the limit case reduces to the matrix operation
+\[
+  \bm 0 \begin{pmatrix}e_{1} & \dots e_{N} \end{pmatrix} = \bm 0,
+\]
+where \( e_{1}, \dots, e_{N} \) are the generated eigen-vectors of a null matrix, i.e, the usual basis. When \( \hat K \) is not entirely a null matrix but it is near to it, we may see it as
+\[
+  \hat K = \epsilon \bm 1, \quad \epsilon << 1.
+\]
+ The normalized eigen-vectors of such matrix are the same for each value of \( \epsilon \), as a result, the matrix multiplication consists of scaling via \( \epsilon \) the desired projection.
+\[
+  \hat K \begin{pmatrix}e_{1} & \dots e_{N} \end{pmatrix} = \epsilon \bm 1 \begin{pmatrix}e_{1} & \dots e_{N} \end{pmatrix} = \epsilon \begin{pmatrix}\|e_{1}\| & \dots \|e_{N}\| \end{pmatrix}.
+\]
+This can be seen in the animation where as the kernel length tends to \( 0 \), the projection is preserved but reduced in scale.
 
 
 Next we consider the second case, where the kernel tends to \( 0 \) on any pair of non equal points. This does not apply when computing \( \lim_{\gamma \to \infty} \mathcal{K}(x,x) \), as \( \mathcal{K}(x,x) = 1 \) is constant for any given value of \( \gamma \). Considering this, the kernel matrix converges to
@@ -120,6 +132,6 @@ As a result, the kernel method performs the following matrix operation in the li
 
 Given this, plotting a projection over the first two principal components leads to the degenerate case of projecting a point in \( (1,0) \) and another point in \( (0,1) \), while the rest are mapped to the origin. This phenomenon can be seen if we set a large enough value of $\gamma$.
 
-However, there is an interesting behaviour of the \texttt{eigh} function when its argument is almost an identity matrix, but not exaclty. The returned eigenvalues are roughly equal to \( 1 \) and the eigenvectors are nearly an orthonormal basis of \( \mathbb{R}^N \), but they are not close to being the usual base. As a result, the plot leads to the projection over \( \mathbb{R}^2\) of a basis in \( \mathbb{R}^N \), which corresponds to the ``spiked''  appearance of the projection, in which the lines that are formed seem to be the projection of perpendicular axes from a higher dimensional space.
+However, there is an interesting behaviour of the \texttt{eigh} function when its argument is almost an identity matrix, but not exactly. The returned eigenvalues are roughly equal to \( 1 \) and the eigenvectors are nearly an orthonormal basis of \( \mathbb{R}^N \), but they are not close to being the usual base. As a result, the plot leads to the projection over \( \mathbb{R}^2\) of a basis in \( \mathbb{R}^N \), which corresponds to the ``spiked''  appearance of the projection, in which the lines that are formed seem to be the projection of perpendicular axes from a higher dimensional space.
 
 \end{document}
